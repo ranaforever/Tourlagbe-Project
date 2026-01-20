@@ -5,27 +5,24 @@ import { BUSINESS_INFO } from '../constants';
 
 interface AdminPanelProps {
   tours: Tour[];
-  setTours: (tours: Tour[]) => void;
+  onUpsertTour: (tour: Tour) => Promise<void>;
+  onDeleteTour: (name: string) => Promise<void>;
   agents: Booker[];
-  setAgents: (agents: Booker[]) => void;
+  onUpsertAgent: (agent: Booker) => Promise<void>;
+  onDeleteAgent: (code: string) => Promise<void>;
   customerTypes: CustomerType[];
-  setCustomerTypes: (types: CustomerType[]) => void;
+  onUpsertCustomerType: (type: CustomerType) => Promise<void>;
+  onDeleteCustomerType: (type: string) => Promise<void>;
   buses: BusData[];
-  onSeed?: () => void;
-  onDeleteTourCascading: (name: string) => void;
-  onMasterReset: () => void;
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
-  tours, setTours, 
-  agents, setAgents, 
-  customerTypes, setCustomerTypes,
-  buses,
-  onSeed,
-  onDeleteTourCascading,
-  onMasterReset
+  tours, onUpsertTour, onDeleteTour,
+  agents, onUpsertAgent, onDeleteAgent,
+  customerTypes, onUpsertCustomerType, onDeleteCustomerType,
+  buses
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'tours' | 'agents' | 'types' | 'print' | 'food' | 'system'>('tours');
+  const [activeSubTab, setActiveSubTab] = useState<'tours' | 'agents' | 'types' | 'print' | 'food'>('tours');
   
   const [newTour, setNewTour] = useState({ name: '', fee: 0 });
   const [newAgent, setNewAgent] = useState({ code: '', name: '' });
@@ -60,66 +57,45 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     });
   }, [allBookings, foodFilterTour, foodFilterBooker]);
 
-  const addTour = (e: React.FormEvent) => {
+  const addTour = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTour.name.trim()) return;
-    const updated = [...tours, { name: newTour.name.trim(), fee: newTour.fee }];
-    setTours(updated);
+    await onUpsertTour({ name: newTour.name.trim(), fee: newTour.fee });
     setNewTour({ name: '', fee: 0 });
   };
 
-  const saveTourEdit = () => {
-    if (editTourIndex !== null && editTourData) {
-      const updated = [...tours];
-      updated[editTourIndex] = editTourData;
-      setTours(updated);
+  const saveTourEdit = async () => {
+    if (editTourData) {
+      await onUpsertTour(editTourData);
       setEditTourIndex(null);
     }
   };
 
-  const addAgent = (e: React.FormEvent) => {
+  const addAgent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAgent.code.trim() || !newAgent.name.trim()) return;
-    const updated = [...agents, { code: newAgent.code.trim().toUpperCase(), name: newAgent.name.trim() }];
-    setAgents(updated);
+    await onUpsertAgent({ code: newAgent.code.trim().toUpperCase(), name: newAgent.name.trim() });
     setNewAgent({ code: '', name: '' });
   };
 
-  const saveAgentEdit = () => {
-    if (editAgentIndex !== null && editAgentData) {
-      const updated = [...agents];
-      updated[editAgentIndex] = editAgentData;
-      setAgents(updated);
+  const saveAgentEdit = async () => {
+    if (editAgentData) {
+      await onUpsertAgent(editAgentData);
       setEditAgentIndex(null);
     }
   };
 
-  const removeAgent = (code: string) => {
-    if (confirm(`Remove agent ${code}?`)) {
-      setAgents(agents.filter(a => a.code !== code));
-    }
-  };
-
-  const addType = (e: React.FormEvent) => {
+  const addType = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newType.type.trim()) return;
-    const updated = [...customerTypes, { type: newType.type.trim(), fee: newType.fee }];
-    setCustomerTypes(updated);
+    await onUpsertCustomerType({ type: newType.type.trim(), fee: newType.fee });
     setNewType({ type: '', fee: 0 });
   };
 
-  const saveTypeEdit = () => {
-    if (editTypeIndex !== null && editTypeData) {
-      const updated = [...customerTypes];
-      updated[editTypeIndex] = editTypeData;
-      setCustomerTypes(updated);
+  const saveTypeEdit = async () => {
+    if (editTypeData) {
+      await onUpsertCustomerType(editTypeData);
       setEditTypeIndex(null);
-    }
-  };
-
-  const removeType = (index: number) => {
-    if (confirm("Remove this category?")) {
-      setCustomerTypes(customerTypes.filter((_, idx) => idx !== index));
     }
   };
 
@@ -137,7 +113,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;700&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
           <style>
             @page { size: A4; margin: 0; }
-            body { font-family: 'Inter', 'Hind Siliguri', sans-serif; background: white; margin: 0; padding: 0; }
+            body { font-family: 'Inter', 'Hind Siliguri', sans-serif; background: white; margin: 0; padding: 20px; }
             .ticket-grid { display: flex; flex-wrap: wrap; width: 210mm; height: 297mm; align-content: flex-start; }
             .ticket-item { 
               width: 50%; 
@@ -306,8 +282,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     { id: 'agents', label: 'Agents', icon: 'fa-user-tie' },
     { id: 'types', label: 'Pricing', icon: 'fa-tags' },
     { id: 'print', label: 'Tickets', icon: 'fa-print' },
-    { id: 'food', label: 'Food', icon: 'fa-utensils' },
-    { id: 'system', label: 'System', icon: 'fa-microchip' }
+    { id: 'food', label: 'Food', icon: 'fa-utensils' }
   ];
 
   return (
@@ -319,7 +294,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       </div>
 
-      {/* Grid-based Sub-Nav: All options visible on all screens */}
       <div className="grid grid-cols-3 md:flex md:flex-wrap bg-white p-1.5 rounded-[28px] shadow-sm mb-8 gap-1.5 border">
         {navTabs.map(tab => (
           <button 
@@ -366,7 +340,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                      ) : (
                         <>
                            <button onClick={() => {setEditTourIndex(i); setEditTourData(t);}} className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center"><i className="fas fa-pen text-[10px]"></i></button>
-                           <button onClick={() => onDeleteTourCascading(t.name)} className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center"><i className="fas fa-trash-alt text-[10px]"></i></button>
+                           <button onClick={() => onDeleteTour(t.name)} className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center"><i className="fas fa-trash-alt text-[10px]"></i></button>
                         </>
                      )}
                   </div>
@@ -409,7 +383,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                      ) : (
                         <>
                            <button onClick={() => {setEditAgentIndex(i); setEditAgentData(a);}} className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center"><i className="fas fa-pen text-[10px]"></i></button>
-                           <button onClick={() => removeAgent(a.code)} className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center"><i className="fas fa-trash-alt text-[10px]"></i></button>
+                           <button onClick={() => onDeleteAgent(a.code)} className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center"><i className="fas fa-trash-alt text-[10px]"></i></button>
                         </>
                      )}
                   </div>
@@ -452,7 +426,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                      ) : (
                         <>
                            <button onClick={() => {setEditTypeIndex(i); setEditTypeData(c);}} className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center"><i className="fas fa-pen text-[10px]"></i></button>
-                           <button onClick={() => removeType(i)} className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center"><i className="fas fa-trash-alt text-[10px]"></i></button>
+                           <button onClick={() => onDeleteCustomerType(c.type)} className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center"><i className="fas fa-trash-alt text-[10px]"></i></button>
                         </>
                      )}
                   </div>
@@ -542,27 +516,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                  </div>
               ))}
-           </div>
-        </div>
-      )}
-
-      {activeSubTab === 'system' && (
-        <div className="space-y-8 animate-in fade-in duration-300">
-           <div className="bg-red-50 border-2 border-red-100 p-8 md:p-12 rounded-[48px] shadow-sm flex flex-col items-center text-center">
-              <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-3xl mb-8 shadow-inner"><i className="fas fa-radiation"></i></div>
-              <h3 className="text-2xl font-black text-red-900 tracking-tighter mb-4 uppercase">System Control</h3>
-              <p className="max-w-md text-[10px] text-red-700 font-bold mb-10 uppercase tracking-tight leading-relaxed">Permanent loss of all business records will occur if actions are taken below.</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-lg">
-                 {onSeed && <button onClick={onSeed} className="py-6 bg-white border border-red-200 text-red-600 rounded-[28px] font-black text-[10px] uppercase tracking-widest hover:bg-red-50 transition-all flex flex-col items-center gap-2"><i className="fas fa-database text-lg"></i>Reset Default</button>}
-                 <button onClick={onMasterReset} className="py-6 bg-red-600 text-white rounded-[28px] font-black text-[10px] uppercase tracking-widest hover:bg-red-700 shadow-xl shadow-red-200 transition-all active:scale-95 flex flex-col items-center gap-2"><i className="fas fa-trash-arrow-up text-lg"></i>Wipe Database</button>
-              </div>
-           </div>
-           
-           <div className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm grid grid-cols-2 gap-4">
-              <div className="bg-gray-50 p-5 rounded-3xl"><p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Routes</p><p className="text-xl font-black text-[#001D4A]">{tours.length}</p></div>
-              <div className="bg-gray-50 p-5 rounded-3xl"><p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Bookers</p><p className="text-xl font-black text-[#001D4A]">{agents.length}</p></div>
-              <div className="bg-gray-50 p-5 rounded-3xl"><p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Entries</p><p className="text-xl font-black text-[#001D4A]">{allBookings.length}</p></div>
-              <div className="bg-green-50 p-5 rounded-3xl"><p className="text-[9px] font-black text-green-400 uppercase tracking-widest mb-1">Status</p><p className="text-xl font-black text-green-600 uppercase">Live</p></div>
            </div>
         </div>
       )}

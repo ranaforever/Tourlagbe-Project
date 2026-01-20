@@ -9,6 +9,7 @@ interface ExpenseTrackerProps {
   bookers: Booker[];
   initialAgentCode?: string;
   tours: Tour[];
+  isAdmin?: boolean;
 }
 
 const EXPENSE_CATEGORIES = [
@@ -23,7 +24,7 @@ const EXPENSE_CATEGORIES = [
   'Others'
 ];
 
-const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onDelete, bookers, initialAgentCode, tours }) => {
+const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onDelete, bookers, initialAgentCode, tours, isAdmin }) => {
   const [formData, setFormData] = useState({
     category: EXPENSE_CATEGORIES[0],
     amount: '',
@@ -80,10 +81,19 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
     setFormData({ ...formData, amount: '', description: '' });
   };
 
+  const handleDelete = (id: string) => {
+    if (!isAdmin) {
+      alert("Only Admin can delete expenses.");
+      return;
+    }
+    if (confirm("Delete this expense record permanently?")) {
+      onDelete(id);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto md:pl-12 pb-10">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Mobile-Friendly Form */}
         <div className="lg:col-span-5 bg-white p-6 md:p-10 rounded-[32px] shadow-sm border border-gray-100">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center shadow-inner"><i className="fas fa-file-invoice-dollar"></i></div>
@@ -112,13 +122,15 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
               </div>
             </div>
 
-            <input required placeholder="YOUR AGENT CODE" value={formData.agentCode} onChange={e => setFormData({...formData, agentCode: e.target.value.toUpperCase()})} className={`w-full px-5 py-4 border-2 rounded-2xl font-black text-center text-sm tracking-widest uppercase transition-all outline-none ${initialAgentCode === 'ADMIN' ? 'bg-indigo-50 border-transparent text-indigo-600' : 'bg-white border-gray-100'}`} />
+            <div className="space-y-1">
+               <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Security Authentication</label>
+               <input required placeholder="YOUR AGENT CODE" value={formData.agentCode} onChange={e => setFormData({...formData, agentCode: e.target.value.toUpperCase()})} className={`w-full px-5 py-4 border-2 rounded-2xl font-black text-center text-sm tracking-widest uppercase transition-all outline-none ${initialAgentCode === 'ADMIN' ? 'bg-indigo-50 border-indigo-400 text-indigo-700' : 'bg-white border-gray-100'}`} />
+            </div>
 
             <button type="submit" className="w-full py-5 bg-[#001D4A] text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all">Submit Expense</button>
           </form>
         </div>
 
-        {/* List Section Optimized for Mobile Cards */}
         <div className="lg:col-span-7 space-y-4">
            <div className="flex justify-between items-center px-2">
               <h3 className="text-xs font-black text-[#001D4A] uppercase tracking-widest">Recent Activity</h3>
@@ -141,10 +153,17 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
                    </div>
                    <div className="flex items-center gap-3">
                       <p className="text-sm font-black text-red-600">৳{ex.amount.toLocaleString()}</p>
-                      <button onClick={() => onDelete(ex.id)} className="w-8 h-8 bg-red-50 text-red-500 rounded-lg flex items-center justify-center active:scale-90"><i className="fas fa-trash-alt text-[10px]"></i></button>
+                      {isAdmin && (
+                        <button onClick={() => handleDelete(ex.id)} className="w-8 h-8 bg-red-50 text-red-500 rounded-lg flex items-center justify-center active:scale-90 transition-all"><i className="fas fa-trash-alt text-[10px]"></i></button>
+                      )}
                    </div>
                 </div>
               ))}
+              {filteredExpenses.length === 0 && (
+                <div className="py-20 text-center bg-white rounded-[32px] border border-dashed border-gray-100">
+                  <p className="text-gray-400 font-black uppercase text-[10px] tracking-widest">No expenses found</p>
+                </div>
+              )}
            </div>
         </div>
       </div>

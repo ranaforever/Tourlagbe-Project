@@ -29,7 +29,7 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : null;
   });
   const [entryCodeInput, setEntryCodeInput] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   const [selectedBusIndex, setSelectedBusIndex] = useState(0);
   const [selectedSeatId, setSelectedSeatId] = useState<string | null>(null);
@@ -61,11 +61,9 @@ const App: React.FC = () => {
       const fetchedBookings: any[] = bookingsRes.data || [];
       const fetchedLocks: any[] = locksRes.data || [];
 
-      // Filter expired locks (Older than 5 mins)
       const now = new Date();
       const validLocks: SeatLock[] = fetchedLocks.filter(lock => new Date(lock.expires_at) > now);
 
-      // Presence logic (Last active in 2 mins)
       const onlineCutoff = new Date(Date.now() - 2 * 60 * 1000);
       const activeAgents = fetchedBookers.filter(b => b.last_active && new Date(b.last_active) > onlineCutoff);
       setOnlineAgents(activeAgents);
@@ -83,6 +81,10 @@ const App: React.FC = () => {
       setTours(fetchedTours);
       setBookers(fetchedBookers);
       setCustomerTypes(fetchedTypes);
+      setExpenses((expensesRes.data || []).map(ex => ({
+        id: ex.id, category: ex.category, amount: ex.amount, description: ex.description,
+        date: ex.date, recordedBy: ex.recorded_by, agentCode: ex.agent_code, tourName: ex.tour_name
+      })));
 
       const busLayouts = fetchedTours.map(t => {
         const seats = generateInitialSeats();
@@ -112,7 +114,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 10000); // 10s auto-refresh
+    const interval = setInterval(fetchData, 10000);
     const channel = supabase.channel('tl_realtime')
       .on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData())
       .subscribe();
@@ -122,9 +124,8 @@ const App: React.FC = () => {
     };
   }, [fetchData]);
 
-  // Heartbeat Presence: Updates Supabase every 30s to show we are online
   useEffect(() => {
-    if (!authenticatedAgent) return;
+    if (!authenticatedAgent || authenticatedAgent.code === 'ADMIN') return;
     const heartbeat = setInterval(async () => {
       await supabase.from('tl_agents').update({ last_active: new Date().toISOString() }).eq('code', authenticatedAgent.code);
     }, 30000);
@@ -142,7 +143,6 @@ const App: React.FC = () => {
     }
 
     if (seat?.lockInfo) {
-      // If WE own the lock, open booking
       if (seat.lockInfo.agent_code === authenticatedAgent?.code) {
         setSelectedSeatId(sid);
         setShowBookingModal(true);
@@ -152,7 +152,6 @@ const App: React.FC = () => {
       return;
     }
 
-    // Try to lock seat (Expires in 5 mins)
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
     try {
       const { error } = await supabase.from('tl_locks').insert({
@@ -164,7 +163,6 @@ const App: React.FC = () => {
       });
 
       if (error) {
-        // Unique constraint failed = someone else locked it first
         alert("Seat just taken! Refreshing data...");
         fetchData();
         return;
@@ -196,14 +194,110 @@ const App: React.FC = () => {
       });
       if (error) throw error;
       
-      // Successfully booked, remove the temporary lock
       await releaseLock(info.busNo, info.seatNo);
       fetchData();
     } catch (error) {
-      alert("Booking failed to save. Please check connection.");
+      alert("Booking failed to save.");
     }
     setShowBookingModal(false);
     setShowDetailModal(false);
+  };
+
+  const handleBookingDelete = async (busId: string, seatId: string) => {
+    if (!isAdminAuthenticated) return;
+    try {
+      const { error } = await supabase.from('tl_bookings').delete().eq('bus_no', busId).eq('seat_no', seatId);
+      if (error) throw error;
+      fetchData();
+    } catch (error) {
+      alert("Delete failed.");
+    }
+  };
+
+  const handleBulkDelete = async (ids: string[]) => {
+    if (!isAdminAuthenticated) return;
+    try {
+      const { error } = await supabase.from('tl_bookings').delete().in('id', ids);
+      if (error) throw error;
+      fetchData();
+    } catch (error) {
+      alert("Bulk delete failed.");
+    }
+  };
+
+  // Admin Master Data Handlers
+  const handleTourUpsert = async (tour: Tour) => {
+    try {
+      const { error } = await supabase.from('tl_tours').upsert({ name: tour.name, fee: tour.fee }, { onConflict: 'name' });
+      if (error) throw error;
+      fetchData();
+    } catch (e) { alert("Failed to save tour."); }
+  };
+
+  const handleTourDelete = async (name: string) => {
+    if (confirm(`Warning: Deleting tour "${name}" will remove it from future selections. Existing bookings for this tour will remain in logs. Continue?`)) {
+      try {
+        const { error } = await supabase.from('tl_tours').delete().eq('name', name);
+        if (error) throw error;
+        fetchData();
+      } catch (e) { alert("Failed to delete tour."); }
+    }
+  };
+
+  const handleAgentUpsert = async (agent: Booker) => {
+    try {
+      const { error } = await supabase.from('tl_agents').upsert({ code: agent.code, name: agent.name }, { onConflict: 'code' });
+      if (error) throw error;
+      fetchData();
+    } catch (e) { alert("Failed to save agent."); }
+  };
+
+  const handleAgentDelete = async (code: string) => {
+    try {
+      const { error } = await supabase.from('tl_agents').delete().eq('code', code);
+      if (error) throw error;
+      fetchData();
+    } catch (e) { alert("Failed to delete agent."); }
+  };
+
+  const handleCustomerTypeUpsert = async (type: CustomerType) => {
+    try {
+      const { error } = await supabase.from('tl_customer_types').upsert({ type: type.type, fee: type.fee }, { onConflict: 'type' });
+      if (error) throw error;
+      fetchData();
+    } catch (e) { alert("Failed to save pricing type."); }
+  };
+
+  const handleCustomerTypeDelete = async (type: string) => {
+    try {
+      const { error } = await supabase.from('tl_customer_types').delete().eq('type', type);
+      if (error) throw error;
+      fetchData();
+    } catch (e) { alert("Failed to delete pricing type."); }
+  };
+
+  const handleExpenseSubmit = async (ex: Expense) => {
+    try {
+      const { error } = await supabase.from('tl_expenses').upsert({
+        id: ex.id, category: ex.category, amount: ex.amount, description: ex.description,
+        date: ex.date, recorded_by: ex.recordedBy, agent_code: ex.agentCode, tour_name: ex.tourName
+      });
+      if (error) throw error;
+      fetchData();
+    } catch (e) {
+      alert("Failed to save expense.");
+    }
+  };
+
+  const handleExpenseDelete = async (id: string) => {
+    if (!isAdminAuthenticated) return;
+    try {
+      const { error } = await supabase.from('tl_expenses').delete().eq('id', id);
+      if (error) throw error;
+      fetchData();
+    } catch (e) {
+      alert("Delete failed.");
+    }
   };
 
   const handleEntryLogin = (e: React.FormEvent) => {
@@ -224,58 +318,76 @@ const App: React.FC = () => {
       setIsAdminAuthenticated(false);
       const storage = rememberMe ? localStorage : sessionStorage;
       storage.setItem('tl_auth_agent', JSON.stringify(agent));
+      storage.setItem('tl_auth_admin', 'false');
       setEntryCodeInput('');
     } else {
-      alert("Invalid Code.");
+      alert("Identity Invalid. Please check your code.");
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-[#001D4A] text-white">
-        <img src={BUSINESS_INFO.logo} className="w-24 animate-pulse mb-8" />
-        <div className="flex gap-2"><div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div><div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div><div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div></div>
-      </div>
-    );
-  }
-
   if (!authenticatedAgent) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-[#001D4A] p-6">
-        <div className="w-full max-sm z-10 animate-in fade-in zoom-in duration-500">
-           <div className="bg-white/5 backdrop-blur-3xl p-8 rounded-[40px] border border-white/10 shadow-2xl">
-              <div className="flex flex-col items-center mb-10">
-                <div className="bg-white p-5 rounded-3xl shadow-xl mb-6"><img src={BUSINESS_INFO.logo} alt="Logo" className="w-16" /></div>
-                <h1 className="text-2xl font-black text-white tracking-tighter text-center uppercase">{BUSINESS_INFO.name}</h1>
-                <p className="text-white/40 text-[9px] font-black uppercase tracking-[0.3em] mt-2 text-center">{BUSINESS_INFO.address}</p>
+      <div className="min-h-screen bg-[#001D4A] flex items-center justify-center p-6 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '30px 30px' }}></div>
+        <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl p-10 relative z-10 animate-in zoom-in duration-500">
+           <div className="flex flex-col items-center mb-10">
+              <img src={BUSINESS_INFO.logo} alt="Logo" className="w-24 mb-6" />
+              <h1 className="text-3xl font-black text-[#001D4A] tracking-tighter uppercase leading-none">{BUSINESS_INFO.name}</h1>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2">Cloud Registry System</p>
+           </div>
+
+           <form onSubmit={handleEntryLogin} className="space-y-6">
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Access Identity</label>
+                 <input 
+                    required
+                    type="password"
+                    placeholder="ENTER CODE"
+                    value={entryCodeInput}
+                    onChange={(e) => setEntryCodeInput(e.target.value)}
+                    className="w-full px-6 py-5 bg-gray-50 border-none rounded-3xl font-black text-center text-xl tracking-[0.2em] uppercase focus:ring-4 focus:ring-orange-500/10 transition-all outline-none"
+                 />
               </div>
-              <form onSubmit={handleEntryLogin} className="space-y-6">
-                 <input autoFocus type="password" placeholder="CODE" value={entryCodeInput} onChange={(e) => setEntryCodeInput(e.target.value)} className="w-full bg-white/10 border border-white/10 px-6 py-5 rounded-2xl text-white font-black text-xl tracking-widest uppercase placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-orange-500 text-center" />
-                 <label className="flex items-center gap-3 cursor-pointer group px-4">
-                    <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="w-5 h-5 rounded border-white/20 bg-white/10 text-orange-500 focus:ring-orange-500 cursor-pointer" />
-                    <span className="text-[10px] font-black uppercase text-white/40 group-hover:text-white transition-colors">Remember Session</span>
-                 </label>
-                 <button type="submit" className="w-full py-5 bg-orange-500 text-white rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">Unlock System</button>
-              </form>
+
+              <div className="flex items-center gap-2 px-2">
+                 <input 
+                    type="checkbox" 
+                    id="remember" 
+                    checked={rememberMe} 
+                    onChange={(e) => setRememberMe(e.target.checked)} 
+                    className="w-4 h-4 rounded border-gray-200 text-orange-500" 
+                 />
+                 <label htmlFor="remember" className="text-[10px] font-black text-gray-400 uppercase tracking-widest cursor-pointer">Remember Me</label>
+              </div>
+
+              <button type="submit" className="w-full py-5 bg-orange-500 text-white rounded-[24px] font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-orange-500/20 active:scale-95 transition-all">
+                Enter System
+              </button>
+           </form>
+
+           <div className="mt-12 text-center">
+              <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest">Secured by Cloud Integration</p>
            </div>
         </div>
       </div>
     );
   }
 
+  const navItems = [
+    { id: 'dashboard', icon: 'fa-chart-line', label: 'Stats' },
+    { id: 'booking', icon: 'fa-bus', label: 'Seats' },
+    { id: 'revenue', icon: 'fa-sack-dollar', label: 'Cash' },
+    { id: 'expenses', icon: 'fa-file-invoice-dollar', label: 'Cost' },
+    { id: 'log', icon: 'fa-clipboard-list', label: 'Log' },
+    { id: 'edit', icon: 'fa-user-pen', label: 'Edit' }
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
       <nav className="hidden md:flex fixed top-0 left-0 bottom-0 w-24 bg-[#001D4A] flex-col items-center justify-between py-8 shadow-2xl z-50">
         <div className="flex flex-col items-center w-full">
           <img src={BUSINESS_INFO.logo} alt="Logo" className="w-14 mb-12" />
-          {[
-            { id: 'dashboard', icon: 'fa-chart-line', label: 'Stats' },
-            { id: 'booking', icon: 'fa-bus', label: 'Seats' },
-            { id: 'revenue', icon: 'fa-sack-dollar', label: 'Cash' },
-            { id: 'expenses', icon: 'fa-file-invoice-dollar', label: 'Cost' },
-            { id: 'log', icon: 'fa-clipboard-list', label: 'Log' },
-            { id: 'edit', icon: 'fa-user-pen', label: 'Edit' }
-          ].map(item => (
+          {navItems.map(item => (
             <button key={item.id} onClick={() => setActiveTab(item.id as any)} className={`w-full py-5 flex flex-col items-center transition-all ${activeTab === item.id ? 'bg-orange-500 text-white shadow-lg' : 'text-white/40 hover:text-white'}`}>
               <i className={`fas ${item.icon} text-xl mb-1`}></i>
               <span className="text-[9px] font-black uppercase">{item.label}</span>
@@ -283,25 +395,28 @@ const App: React.FC = () => {
           ))}
         </div>
         <div className="flex flex-col items-center gap-6">
-          <button onClick={() => isAdminAuthenticated ? setActiveTab('admin') : setActiveTab('admin')} className={`w-14 h-14 flex items-center justify-center rounded-2xl transition-all ${activeTab === 'admin' ? 'bg-orange-500 text-white' : 'bg-white/5 text-white/40'}`}><i className="fas fa-user-shield text-xl"></i></button>
+          {isAdminAuthenticated && (
+            <button onClick={() => setActiveTab('admin')} className={`w-14 h-14 flex items-center justify-center rounded-2xl transition-all ${activeTab === 'admin' ? 'bg-orange-500 text-white' : 'bg-white/5 text-white/40'}`}>
+              <i className="fas fa-user-shield text-xl"></i>
+            </button>
+          )}
           <button onClick={() => setShowLogoutConfirm(true)} className="w-14 h-14 flex items-center justify-center rounded-2xl bg-red-500/10 text-red-500"><i className="fas fa-power-off text-xl"></i></button>
         </div>
       </nav>
 
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-[75px] bg-[#001D4A]/95 backdrop-blur-md flex items-center justify-around z-[100] border-t border-white/10 shadow-[0_-10px_30px_rgba(0,0,0,0.3)] px-1 pb-safe">
-        {[
-          { id: 'dashboard', icon: 'fa-chart-line', label: 'Stats' },
-          { id: 'booking', icon: 'fa-bus', label: 'Seats' },
-          { id: 'revenue', icon: 'fa-sack-dollar', label: 'Cash' },
-          { id: 'expenses', icon: 'fa-file-invoice-dollar', label: 'Cost' },
-          { id: 'log', icon: 'fa-clipboard-list', label: 'Log' },
-          { id: 'edit', icon: 'fa-user-pen', label: 'Edit' }
-        ].map(item => (
+        {navItems.map(item => (
           <button key={item.id} onClick={() => setActiveTab(item.id as any)} className={`flex-1 flex flex-col items-center justify-center gap-1 transition-all py-2 rounded-2xl mx-0.5 ${activeTab === item.id ? 'bg-orange-500 text-white shadow-lg' : 'text-white/30'}`}>
             <i className={`fas ${item.icon} text-lg`}></i>
             <span className="text-[7px] font-black uppercase tracking-tight">{item.label}</span>
           </button>
         ))}
+        {isAdminAuthenticated && (
+          <button onClick={() => setActiveTab('admin')} className={`flex-1 flex flex-col items-center justify-center gap-1 transition-all py-2 rounded-2xl mx-0.5 ${activeTab === 'admin' ? 'bg-orange-500 text-white shadow-lg' : 'text-white/30'}`}>
+            <i className="fas fa-user-shield text-lg"></i>
+            <span className="text-[7px] font-black uppercase tracking-tight">Admin</span>
+          </button>
+        )}
       </nav>
 
       <main className="flex-grow md:ml-24 p-4 md:p-10 pb-24 md:pb-10">
@@ -325,7 +440,7 @@ const App: React.FC = () => {
           {activeTab === 'booking' && (
             <div className="animate-in fade-in duration-500 space-y-6">
                <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-3 sticky top-0 z-40 overflow-x-auto no-scrollbar">
-                  <select value={selectedBusIndex} onChange={(e) => setSelectedBusIndex(Number(e.target.value))} className="bg-transparent font-black text-[#001D4A] outline-none text-xs uppercase tracking-widest cursor-pointer appearance-none px-4">
+                  <select value={selectedBusIndex} onChange={(e) => setSelectedBusIndex(Number(e.target.value))} className="bg-transparent font-black text-[#001D4A] outline-none text-sm uppercase tracking-widest cursor-pointer appearance-none px-4">
                     {buses.map((bus, idx) => <option key={bus.busId} value={idx}>{bus.busId}</option>)}
                   </select>
                   <div className="h-4 w-[1px] bg-gray-200"></div>
@@ -343,16 +458,23 @@ const App: React.FC = () => {
           )}
           {activeTab === 'dashboard' && <Dashboard buses={buses} expenses={expenses} />}
           {activeTab === 'log' && <BookingLog buses={buses} bookers={bookers} />}
-          {activeTab === 'expenses' && <ExpenseTracker expenses={expenses} onSubmit={() => fetchData()} onDelete={() => fetchData()} bookers={bookers} initialAgentCode={authenticatedAgent?.code} tours={tours} />}
+          {activeTab === 'expenses' && <ExpenseTracker expenses={expenses} onSubmit={handleExpenseSubmit} onDelete={handleExpenseDelete} bookers={bookers} initialAgentCode={authenticatedAgent?.code} tours={tours} isAdmin={isAdminAuthenticated} />}
           {activeTab === 'revenue' && <RevenueReport buses={buses} expenses={expenses} tours={tours} />}
-          {activeTab === 'edit' && <EditData buses={buses} onUpdate={handleBookingSubmit} onDelete={() => {}} onEdit={(info) => { setEditingInfo(info); setSelectedSeatId(info.seatNo); setShowBookingModal(true); }} bookers={bookers} />}
-          {activeTab === 'admin' && isAdminAuthenticated && <AdminPanel tours={tours} setTours={() => {}} agents={bookers} setAgents={() => {}} customerTypes={customerTypes} setCustomerTypes={() => {}} buses={buses} onDeleteTourCascading={() => {}} onMasterReset={() => {}} />}
+          {activeTab === 'edit' && <EditData buses={buses} onUpdate={handleBookingSubmit} onDelete={handleBookingDelete} onBulkDelete={handleBulkDelete} onEdit={(info) => { setEditingInfo(info); setSelectedSeatId(info.seatNo); setShowBookingModal(true); }} bookers={bookers} isAdmin={isAdminAuthenticated} />}
+          {activeTab === 'admin' && isAdminAuthenticated && (
+            <AdminPanel 
+              tours={tours} onUpsertTour={handleTourUpsert} onDeleteTour={handleTourDelete}
+              agents={bookers} onUpsertAgent={handleAgentUpsert} onDeleteAgent={handleAgentDelete}
+              customerTypes={customerTypes} onUpsertCustomerType={handleCustomerTypeUpsert} onDeleteCustomerType={handleCustomerTypeDelete}
+              buses={buses}
+            />
+          )}
         </div>
       </main>
 
-      {showLogoutConfirm && <ConfirmationDialog message="Are you sure you want to end your session?" onConfirm={() => { setAuthenticatedAgent(null); setShowLogoutConfirm(false); localStorage.removeItem('tl_auth_agent'); sessionStorage.removeItem('tl_auth_agent'); }} onCancel={() => setShowLogoutConfirm(false)} />}
-      {showBookingModal && <BookingModal seatId={selectedSeatId!} busNo={editingInfo ? editingInfo.busNo : (buses[selectedBusIndex]?.busId || '')} onClose={() => { releaseLock(buses[selectedBusIndex].busId, selectedSeatId!); setShowBookingModal(false); setEditingInfo(null); }} onSubmit={handleBookingSubmit} tours={tours} bookers={bookers} customerTypes={customerTypes} existingData={editingInfo || undefined} />}
-      {showDetailModal && editingInfo && <SeatDetailModal info={editingInfo} onClose={() => { setShowDetailModal(false); setEditingInfo(null); }} onEdit={() => { setShowDetailModal(false); setShowBookingModal(true); }} onCancel={() => { setShowDetailModal(false); }} isAdmin={isAdminAuthenticated} />}
+      {showLogoutConfirm && <ConfirmationDialog message="Are you sure you want to end your session?" onConfirm={() => { setAuthenticatedAgent(null); setIsAdminAuthenticated(false); setShowLogoutConfirm(false); localStorage.removeItem('tl_auth_agent'); sessionStorage.removeItem('tl_auth_agent'); localStorage.removeItem('tl_auth_admin'); sessionStorage.removeItem('tl_auth_admin'); }} onCancel={() => setShowLogoutConfirm(false)} />}
+      {showBookingModal && <BookingModal seatId={selectedSeatId!} busNo={editingInfo ? editingInfo.busNo : (buses[selectedBusIndex]?.busId || '')} onClose={() => { releaseLock(buses[selectedBusIndex].busId, selectedSeatId!); setShowBookingModal(false); setEditingInfo(null); }} onSubmit={handleBookingSubmit} tours={tours} bookers={bookers} customerTypes={customerTypes} existingData={editingInfo || undefined} isAdmin={isAdminAuthenticated} />}
+      {showDetailModal && editingInfo && <SeatDetailModal info={editingInfo} onClose={() => { setShowDetailModal(false); setEditingInfo(null); }} onEdit={() => { setShowDetailModal(false); setShowBookingModal(true); }} onCancel={() => { handleBookingDelete(editingInfo.busNo, editingInfo.seatNo); setShowDetailModal(false); }} onUpdate={handleBookingSubmit} isAdmin={isAdminAuthenticated} />}
     </div>
   );
 };

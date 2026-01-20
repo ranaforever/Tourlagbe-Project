@@ -11,9 +11,10 @@ interface BookingModalProps {
   bookers: Booker[];
   customerTypes: CustomerType[];
   existingData?: BookingInfo;
+  isAdmin?: boolean;
 }
 
-const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onSubmit, tours, bookers, customerTypes, existingData }) => {
+const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onSubmit, tours, bookers, customerTypes, existingData, isAdmin }) => {
   const [formData, setFormData] = useState({
     name: existingData?.name || '',
     mobile: existingData?.mobile || '',
@@ -24,7 +25,7 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
     customerType: existingData?.customerType || (customerTypes.length > 0 ? customerTypes[0].type : ''),
     discountAmount: existingData?.discountAmount || 0,
     advanceAmount: existingData?.advanceAmount || 0,
-    bookerCode: existingData?.bookerCode || ''
+    bookerCode: existingData?.bookerCode || (isAdmin ? 'ADMIN' : '')
   });
 
   const [tourFees, setTourFees] = useState(0);
@@ -43,7 +44,7 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
     const cFee = cType ? cType.fee : 0;
     setCustomerTypeFees(cFee);
 
-    if (formData.bookerCode.toUpperCase() === 'ADMIN' || formData.bookerCode === '@Rana&01625@') {
+    if (formData.bookerCode.toUpperCase() === 'ADMIN') {
        setBookerName('System Admin');
     } else {
        const booker = bookers.find(b => b.code.toUpperCase() === formData.bookerCode.toUpperCase());
@@ -67,7 +68,7 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bookerName) {
+    if (!isAdmin && !bookerName) {
       alert("Invalid Agent Code.");
       return;
     }
@@ -81,7 +82,7 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
       paymentStatus: dueAmount <= 0 ? 'Paid' : (formData.advanceAmount > 0 ? 'Partial' : 'Due'),
       busNo: formData.tourName,
       seatNo: seatId,
-      bookedBy: bookerName,
+      bookedBy: bookerName || 'System Admin',
       bookingDate: existingData?.bookingDate || new Date().toISOString()
     };
     onSubmit(info);
@@ -142,8 +143,16 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
               <div className="space-y-1">
                 <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Agent Verification</label>
                 <div className="relative">
-                  <input required name="bookerCode" value={formData.bookerCode} onChange={handleChange} className={`w-full px-5 py-4 border-2 rounded-2xl font-black text-sm tracking-widest uppercase outline-none transition-all ${bookerName ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-100 bg-gray-50 text-gray-800'}`} placeholder="YOUR CODE" />
-                  {bookerName && <i className="fas fa-check-circle absolute right-4 top-1/2 -translate-y-1/2 text-green-500"></i>}
+                  <input 
+                    required 
+                    name="bookerCode" 
+                    value={formData.bookerCode} 
+                    onChange={handleChange} 
+                    readOnly={isAdmin}
+                    className={`w-full px-5 py-4 border-2 rounded-2xl font-black text-sm tracking-widest uppercase outline-none transition-all ${isAdmin ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : (bookerName ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-100 bg-gray-50 text-gray-800')}`} 
+                    placeholder={isAdmin ? "ADMIN BYPASS" : "YOUR CODE"} 
+                  />
+                  {(bookerName || isAdmin) && <i className="fas fa-check-circle absolute right-4 top-1/2 -translate-y-1/2 text-green-500"></i>}
                 </div>
               </div>
             </div>

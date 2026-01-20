@@ -17,7 +17,6 @@ const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit
   const ticketRef = useRef<HTMLDivElement>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-  // Generate QR Code URL based on booking info
   const qrData = `ID:${info.id}|Seat:${info.seatNo}|Name:${info.name}|Tour:${info.tourName}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
 
@@ -136,7 +135,6 @@ const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit
                 </button>
              </div>
 
-             {/* Ticket Design */}
              <div ref={ticketRef} className="bg-white border-2 border-dashed border-gray-200 rounded-[30px] md:rounded-[40px] p-6 md:p-8 mb-8 relative overflow-hidden shadow-sm">
                 <div className="absolute -left-5 top-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full border-r-2 border-dashed border-gray-200 z-10"></div>
                 <div className="absolute -right-5 top-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full border-l-2 border-dashed border-gray-200 z-10"></div>
@@ -200,7 +198,6 @@ const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit
                 </div>
              </div>
 
-             {/* High-Performance Action Grid */}
              <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <button 
@@ -233,12 +230,14 @@ const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit
                   </button>
                 </div>
 
-                <button 
-                  onClick={onCancel}
-                  className="w-full py-4 bg-[#fff1f1] text-red-500 rounded-[32px] md:rounded-[40px] font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95 flex items-center justify-center gap-2"
-                >
-                  <i className="fas fa-trash-alt"></i> Cancel Booking Permanently
-                </button>
+                {isAdmin && (
+                  <button 
+                    onClick={onCancel}
+                    className="w-full py-4 bg-[#fff1f1] text-red-500 rounded-[32px] md:rounded-[40px] font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    <i className="fas fa-trash-alt"></i> Cancel Booking Permanently
+                  </button>
+                )}
              </div>
           </div>
         </div>
