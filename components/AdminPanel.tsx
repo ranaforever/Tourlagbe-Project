@@ -228,25 +228,25 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         <head>
           <title>Food Tokens - Tour লাগবে</title>
           <script src="https://cdn.tailwindcss.com"></script>
-          <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;700&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
           <style>
             @page { size: A4; margin: 0; }
-            body { font-family: 'Inter', 'Hind Siliguri', sans-serif; background: white; margin: 0; padding: 0; }
+            body { font-family: 'Inter', sans-serif; background: white; margin: 0; padding: 0; }
             .token-grid { 
               display: grid; 
-              grid-template-columns: repeat(4, 25%); 
-              grid-template-rows: repeat(6, 16.666%);
+              grid-template-columns: repeat(4, 1fr); 
+              grid-template-rows: repeat(6, 1fr);
               width: 210mm; 
               height: 297mm; 
               box-sizing: border-box;
             }
             .token-item { 
-              border: 0.2pt dashed #ccc; 
-              padding: 10px; 
+              border: 0.1pt dashed #aaa; 
+              padding: 12px; 
               display: flex; 
               flex-direction: column; 
               align-items: center; 
-              justify-content: center;
+              justify-content: space-between;
               text-align: center;
               position: relative;
               overflow: hidden;
@@ -255,13 +255,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             }
             .token-watermark {
               position: absolute;
-              font-size: 32px;
+              font-size: 40px;
               font-weight: 900;
-              color: rgba(0,0,0,0.03);
+              color: rgba(0,0,0,0.035);
               transform: rotate(-15deg);
               z-index: 0;
               pointer-events: none;
               white-space: nowrap;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%) rotate(-15deg);
             }
             @media print { body { -webkit-print-color-adjust: exact; } }
           </style>
@@ -271,23 +274,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             ${bookingsToPrint.map(info => `
               <div class="token-item">
                 <div class="token-watermark">${foodType.toUpperCase()}</div>
-                <div class="relative z-10 w-full flex flex-col items-center">
-                   <img src="${BUSINESS_INFO.logo}" class="h-20 mb-3" />
-                   <h2 class="text-[13px] font-black text-indigo-900 uppercase tracking-[0.2em] leading-none mb-1">${foodType}</h2>
-                   
-                   <div class="w-full my-2 border-y border-dashed border-gray-200 py-2">
-                      <p class="text-[11px] font-black text-gray-800 leading-none mb-1.5">${info.name}</p>
-                      <div class="bg-indigo-900 text-white rounded-md px-3 py-1 inline-block">
-                         <p class="text-[10px] font-black uppercase tracking-tighter">Seat: ${info.seatNo}</p>
-                      </div>
+                
+                <div class="relative z-10 flex flex-col items-center">
+                   <img src="${BUSINESS_INFO.logo}" class="h-10 mb-2" />
+                   <h2 class="text-[11px] font-black text-indigo-900 uppercase tracking-[0.2em] leading-none mb-1">${foodType}</h2>
+                </div>
+                
+                <div class="relative z-10 w-full">
+                   <p class="text-[12px] font-black text-gray-800 leading-tight mb-2">${info.name}</p>
+                   <div class="bg-[#001D4A] text-white rounded-[10px] px-3 py-1.5 inline-block shadow-sm">
+                      <p class="text-[10px] font-black uppercase tracking-widest">Seat: ${info.seatNo}</p>
                    </div>
+                </div>
 
-                   <div class="flex flex-col items-center">
-                      <span class="text-[8px] font-black text-orange-500 uppercase tracking-widest mb-0.5">Serving Time</span>
-                      <span class="text-[14px] font-black text-gray-900 leading-none">${foodTime}</span>
-                   </div>
-                   
-                   <p class="text-[7px] text-gray-300 font-bold uppercase mt-3 tracking-tight">${info.tourName}</p>
+                <div class="relative z-10 flex flex-col items-center">
+                   <span class="text-[8px] font-black text-orange-500 uppercase tracking-[0.1em] mb-1">Serving Time</span>
+                   <span class="text-[14px] font-black text-gray-900 leading-none">${foodTime}</span>
                 </div>
               </div>
             `).join('')}
@@ -382,7 +384,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       <button onClick={saveAgentEdit} className="text-green-600 font-black px-3 py-1 rounded">SAVE</button>
                     ) : (
                       <>
-                        <button onClick={() => {setEditTourIndex(i); setEditAgentData(a);}} className="text-blue-500 p-2 hover:bg-blue-50 rounded"><i className="fas fa-pen"></i></button>
+                        <button onClick={() => {setEditAgentIndex(i); setEditAgentData(a);}} className="text-blue-500 p-2 hover:bg-blue-50 rounded"><i className="fas fa-pen"></i></button>
                         <button onClick={() => removeAgent(a.code)} className="text-red-400 p-2 hover:bg-red-50 rounded"><i className="fas fa-trash-alt"></i></button>
                       </>
                     )}
