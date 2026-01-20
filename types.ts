@@ -42,6 +42,7 @@ export interface Expense {
   description: string;
   date: string;
   recordedBy: string;
+  agentCode: string;
 }
 
 export interface SeatData {

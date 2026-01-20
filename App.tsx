@@ -88,10 +88,20 @@ const App: React.FC = () => {
         bookingDate: b.booking_date
       }));
 
+      const mappedExpenses: Expense[] = fetchedExpenses.map(e => ({
+        id: e.id,
+        category: e.category,
+        amount: e.amount,
+        description: e.description,
+        date: e.date,
+        recordedBy: e.recorded_by,
+        agentCode: e.agent_code || 'ADMIN' // Default to admin if missing
+      }));
+
       setTours(fetchedTours);
       setBookers(fetchedBookers);
       setCustomerTypes(fetchedTypes);
-      setExpenses(fetchedExpenses);
+      setExpenses(mappedExpenses);
 
       const busLayouts = fetchedTours.map(t => {
         const seats = generateInitialSeats();
@@ -157,7 +167,15 @@ const App: React.FC = () => {
 
   const handleExpenseSubmit = async (expense: Expense) => {
     try {
-      const { error } = await supabase.from('tl_expenses').upsert(expense);
+      const { error } = await supabase.from('tl_expenses').upsert({
+        id: expense.id,
+        category: expense.category,
+        amount: expense.amount,
+        description: expense.description,
+        date: expense.date,
+        recorded_by: expense.recordedBy,
+        agent_code: expense.agentCode
+      });
       if (error) throw error;
       fetchData();
     } catch (error) {

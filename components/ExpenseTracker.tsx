@@ -33,6 +33,23 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Support ADMIN bypass for authorization
+    if (formData.agentCode === "@Rana&01625@" || formData.agentCode === "ADMIN") {
+       const newExpense: Expense = {
+          id: Math.random().toString(36).substr(2, 9).toUpperCase(),
+          category: formData.category,
+          amount: parseFloat(formData.amount),
+          description: formData.description,
+          date: formData.date,
+          recordedBy: 'System Administrator',
+          agentCode: 'ADMIN'
+        };
+        onSubmit(newExpense);
+        setFormData({ ...formData, amount: '', description: '' });
+        return;
+    }
+
     const booker = bookers.find(b => b.code.toUpperCase() === formData.agentCode.toUpperCase());
     if (!booker) {
       alert("Verification Failed: Invalid Agent Code.");
@@ -45,16 +62,16 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
       amount: parseFloat(formData.amount),
       description: formData.description,
       date: formData.date,
-      recordedBy: booker.name
+      recordedBy: booker.name,
+      agentCode: booker.code
     };
 
     onSubmit(newExpense);
-    setFormData({ ...formData, amount: '', description: '', agentCode: initialAgentCode || '' });
-    alert("Expense recorded successfully!");
+    setFormData({ ...formData, amount: '', description: '' });
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-6xl mx-auto md:pl-12">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Form Section */}
         <div className="lg:col-span-5 bg-white p-8 md:p-10 rounded-[40px] shadow-xl border border-gray-100">
@@ -74,7 +91,7 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
               <select 
                 value={formData.category}
                 onChange={e => setFormData({...formData, category: e.target.value})}
-                className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl font-black text-[#001D4A]"
+                className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl font-black text-[#001D4A] outline-none appearance-none cursor-pointer"
               >
                 {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -89,7 +106,7 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
                   placeholder="0.00"
                   value={formData.amount}
                   onChange={e => setFormData({...formData, amount: e.target.value})}
-                  className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl font-black text-red-600"
+                  className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl font-black text-red-600 outline-none placeholder:text-red-200"
                 />
               </div>
               <div className="space-y-1">
@@ -99,7 +116,7 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
                   type="date"
                   value={formData.date}
                   onChange={e => setFormData({...formData, date: e.target.value})}
-                  className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl font-black"
+                  className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl font-black outline-none"
                 />
               </div>
             </div>
@@ -111,7 +128,7 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
                 placeholder="Details of expenditure..."
                 value={formData.description}
                 onChange={e => setFormData({...formData, description: e.target.value})}
-                className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl font-bold text-sm"
+                className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl font-bold text-sm outline-none placeholder:text-gray-200"
               />
             </div>
 
@@ -119,10 +136,11 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Agent Authorization</label>
               <input 
                 required
+                readOnly={initialAgentCode === 'ADMIN'}
                 placeholder="YOUR AGENT CODE"
                 value={formData.agentCode}
                 onChange={e => setFormData({...formData, agentCode: e.target.value.toUpperCase()})}
-                className="w-full px-5 py-4 bg-indigo-50 border-2 border-indigo-100 rounded-2xl font-black text-center text-lg tracking-widest uppercase"
+                className={`w-full px-5 py-4 border-2 rounded-2xl font-black text-center text-lg tracking-widest uppercase outline-none transition-all ${initialAgentCode === 'ADMIN' ? 'bg-indigo-50 border-indigo-100 text-indigo-600 cursor-default' : 'bg-white border-gray-100 focus:border-indigo-400'}`}
               />
             </div>
 
@@ -153,7 +171,10 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
                           <div>
                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">{ex.category}</p>
                              <p className="font-black text-[#001D4A] text-sm">{ex.description || 'No description'}</p>
-                             <p className="text-[9px] text-gray-300 font-bold uppercase mt-1">{new Date(ex.date).toLocaleDateString()} • {ex.recordedBy}</p>
+                             <div className="flex items-center gap-2 mt-1">
+                                <p className="text-[9px] text-gray-300 font-bold uppercase">{new Date(ex.date).toLocaleDateString()} • {ex.recordedBy}</p>
+                                <span className="text-[8px] font-black text-white bg-indigo-500 px-2 py-0.5 rounded uppercase tracking-tighter shadow-sm">ID: {ex.agentCode}</span>
+                             </div>
                           </div>
                        </div>
                        <div className="flex items-center gap-4">
