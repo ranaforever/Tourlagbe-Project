@@ -14,7 +14,7 @@ export enum Religion {
 }
 
 export interface BookingInfo {
-  id: string; // Unique booking ID
+  id: string;
   name: string;
   mobile: string;
   address: string;
@@ -30,9 +30,18 @@ export interface BookingInfo {
   paymentStatus: 'Paid' | 'Partial' | 'Due';
   busNo: string;
   seatNo: string;
-  bookedBy: string; // Booker Name
+  bookedBy: string;
   bookerCode: string;
   bookingDate: string;
+}
+
+export interface SeatLock {
+  id?: string;
+  bus_no: string;
+  seat_no: string;
+  agent_code: string;
+  agent_name: string;
+  expires_at: string;
 }
 
 export interface Expense {
@@ -43,13 +52,14 @@ export interface Expense {
   date: string;
   recordedBy: string;
   agentCode: string;
-  tourName?: string; // New field for tour-wise tracking
+  tourName?: string;
 }
 
 export interface SeatData {
-  id: string; // e.g., 'A1'
+  id: string;
   isBooked: boolean;
   bookingInfo?: BookingInfo;
+  lockInfo?: SeatLock;
 }
 
 export interface BusData {
@@ -65,6 +75,7 @@ export interface Tour {
 export interface Booker {
   code: string;
   name: string;
+  last_active?: string;
 }
 
 export interface CustomerType {
