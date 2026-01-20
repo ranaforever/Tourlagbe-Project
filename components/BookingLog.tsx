@@ -1,9 +1,10 @@
 
 import React, { useState, useMemo } from 'react';
-import { BusData, BookingInfo } from '../types';
+import { BusData, BookingInfo, Booker } from '../types';
 
 interface BookingLogProps {
   buses: BusData[];
+  bookers: Booker[];
 }
 
 const BookingLog: React.FC<BookingLogProps> = ({ buses }) => {

@@ -35,6 +35,15 @@ export interface BookingInfo {
   bookingDate: string;
 }
 
+export interface Expense {
+  id: string;
+  category: string;
+  amount: number;
+  description: string;
+  date: string;
+  recordedBy: string;
+}
+
 export interface SeatData {
   id: string; // e.g., 'A1'
   isBooked: boolean;

@@ -1,12 +1,13 @@
 
 import React, { useMemo } from 'react';
-import { BusData, BookingInfo } from '../types';
+import { BusData, BookingInfo, Expense } from '../types';
 
 interface DashboardProps {
   buses: BusData[];
+  expenses: Expense[];
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ buses }) => {
+const Dashboard: React.FC<DashboardProps> = ({ buses, expenses }) => {
   const allBookings: BookingInfo[] = useMemo(() => 
     buses.flatMap(b => b.seats.filter(s => s.isBooked).map(s => s.bookingInfo!)),
     [buses]
@@ -15,6 +16,8 @@ const Dashboard: React.FC<DashboardProps> = ({ buses }) => {
   const totalRevenue = allBookings.reduce((sum, b) => sum + (b.tourFees + b.customerTypeFees - b.discountAmount), 0);
   const totalAdvance = allBookings.reduce((sum, b) => sum + b.advanceAmount, 0);
   const totalDue = allBookings.reduce((sum, b) => sum + b.dueAmount, 0);
+  const totalExpenses = expenses.reduce((sum, ex) => sum + ex.amount, 0);
+  const netProfit = totalRevenue - totalExpenses;
 
   const bookerRanking = useMemo(() => {
     const counts: Record<string, { name: string, seats: number, revenue: number }> = {};
@@ -32,9 +35,9 @@ const Dashboard: React.FC<DashboardProps> = ({ buses }) => {
 
   const stats = [
     { label: 'Fleet Capacity', value: buses.reduce((acc, b) => acc + b.seats.length, 0), icon: 'fa-chair', color: 'bg-indigo-600' },
-    { label: 'Confirmed Booking', value: allBookings.length, icon: 'fa-check-double', color: 'bg-green-500' },
-    { label: 'Total Sales', value: `৳${totalRevenue.toLocaleString()}`, icon: 'fa-shopping-cart', color: 'bg-blue-500' },
-    { label: 'Balance Due', value: `৳${totalDue.toLocaleString()}`, icon: 'fa-hourglass-half', color: 'bg-red-500' },
+    { label: 'Confirmed Seats', value: allBookings.length, icon: 'fa-check-double', color: 'bg-green-500' },
+    { label: 'Projected Sales', value: `৳${totalRevenue.toLocaleString()}`, icon: 'fa-sack-dollar', color: 'bg-blue-500' },
+    { label: 'Projected Profit', value: `৳${netProfit.toLocaleString()}`, icon: 'fa-chart-pie', color: 'bg-[#001D4A]' },
   ];
 
   return (

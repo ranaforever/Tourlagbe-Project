@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { BUSINESS_INFO, generateInitialSeats, TOURS, BOOKERS, CUSTOMER_TYPES } from './constants';
-import { BusData, BookingInfo, Tour, Booker, CustomerType } from './types';
+import { BusData, BookingInfo, Tour, Booker, CustomerType, Expense } from './types';
 import BusLayout from './components/BusLayout';
 import BookingModal from './components/BookingModal';
 import ConfirmationDialog from './components/ConfirmationDialog';
@@ -11,14 +11,25 @@ import EditData from './components/EditData';
 import AdminPanel from './components/AdminPanel';
 import SeatDetailModal from './components/SeatDetailModal';
 import SecurityModal from './components/SecurityModal';
+import ExpenseTracker from './components/ExpenseTracker';
+import RevenueReport from './components/RevenueReport';
 import { supabase } from './supabase';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'booking' | 'dashboard' | 'log' | 'edit' | 'admin'>('booking');
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [activeTab, setActiveTab] = useState<'booking' | 'dashboard' | 'log' | 'edit' | 'admin' | 'expenses' | 'revenue'>('booking');
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => {
+    return sessionStorage.getItem('tl_auth_admin') === 'true';
+  });
   const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+
+  // Global Access Authentication
+  const [authenticatedAgent, setAuthenticatedAgent] = useState<Booker | null>(() => {
+    const saved = sessionStorage.getItem('tl_auth_agent');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [entryCodeInput, setEntryCodeInput] = useState('');
 
   const [selectedBusIndex, setSelectedBusIndex] = useState(0);
   const [selectedSeatId, setSelectedSeatId] = useState<string | null>(null);
@@ -38,20 +49,23 @@ const App: React.FC = () => {
   const [bookers, setBookers] = useState<Booker[]>([]);
   const [customerTypes, setCustomerTypes] = useState<CustomerType[]>([]);
   const [buses, setBuses] = useState<BusData[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
 
   const fetchData = useCallback(async () => {
     try {
-      const [toursRes, bookersRes, typesRes, bookingsRes] = await Promise.all([
+      const [toursRes, bookersRes, typesRes, bookingsRes, expensesRes] = await Promise.all([
         supabase.from('tl_tours').select('*').order('name'),
         supabase.from('tl_agents').select('*').order('name'),
         supabase.from('tl_customer_types').select('*').order('type'),
-        supabase.from('tl_bookings').select('*')
+        supabase.from('tl_bookings').select('*'),
+        supabase.from('tl_expenses').select('*').order('date', { ascending: false })
       ]);
 
       const fetchedTours = toursRes.data || [];
       const fetchedBookers = bookersRes.data || [];
       const fetchedTypes = typesRes.data || [];
       const fetchedBookings: any[] = bookingsRes.data || [];
+      const fetchedExpenses: any[] = expensesRes.data || [];
 
       const mappedBookings: BookingInfo[] = fetchedBookings.map(b => ({
         id: b.id,
@@ -78,6 +92,7 @@ const App: React.FC = () => {
       setTours(fetchedTours);
       setBookers(fetchedBookers);
       setCustomerTypes(fetchedTypes);
+      setExpenses(fetchedExpenses);
 
       const busLayouts = fetchedTours.map(t => {
         const seats = generateInitialSeats();
@@ -101,7 +116,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-    const channel = supabase.channel('tl_realtime_v3')
+    const channel = supabase.channel('tl_realtime_v4')
       .on('postgres_changes', { event: '*', schema: 'public' }, () => {
         fetchData();
       })
@@ -139,6 +154,26 @@ const App: React.FC = () => {
     }
     setShowBookingModal(false);
     setShowDetailModal(false);
+  };
+
+  const handleExpenseSubmit = async (expense: Expense) => {
+    try {
+      const { error } = await supabase.from('tl_expenses').upsert(expense);
+      if (error) throw error;
+      fetchData();
+    } catch (error) {
+      alert("Expense sync failed.");
+    }
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    if (!confirm("Delete this expense permanently?")) return;
+    try {
+      await supabase.from('tl_expenses').delete().eq('id', id);
+      fetchData();
+    } catch (error) {
+      alert("Delete failed.");
+    }
   };
 
   const confirmDeselect = async () => {
@@ -233,14 +268,56 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAdminLogin = (e: React.FormEvent) => {
+  const handleEntryLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Check Admin Password first
+    if (entryCodeInput === "@Rana&01625@") {
+      setIsAdminAuthenticated(true);
+      sessionStorage.setItem('tl_auth_admin', 'true');
+      
+      const adminAgent: Booker = { code: 'ADMIN', name: 'System Administrator' };
+      setAuthenticatedAgent(adminAgent);
+      sessionStorage.setItem('tl_auth_agent', JSON.stringify(adminAgent));
+      setEntryCodeInput('');
+      return;
+    }
+
+    // Check Booker Code
+    const agent = bookers.find(b => b.code.toUpperCase() === entryCodeInput.toUpperCase());
+    if (agent) {
+      setAuthenticatedAgent(agent);
+      sessionStorage.setItem('tl_auth_agent', JSON.stringify(agent));
+      setIsAdminAuthenticated(false);
+      sessionStorage.removeItem('tl_auth_admin');
+      setEntryCodeInput('');
+    } else {
+      alert("Unauthorized Access: Invalid Booker Code or Password.");
+    }
+  };
+
+  const handleAdminAuth = (e: React.FormEvent) => {
     e.preventDefault();
     if (adminPasswordInput === "@Rana&01625@") {
       setIsAdminAuthenticated(true);
+      sessionStorage.setItem('tl_auth_admin', 'true');
       setShowAdminLogin(false);
+      setAdminPasswordInput('');
       setActiveTab('admin');
     } else {
-      alert("Access Denied!");
+      alert("Incorrect Admin Password.");
+    }
+  };
+
+  const handleLogout = () => {
+    if (confirm("Sign out from your session and lock the terminal?")) {
+      setAuthenticatedAgent(null);
+      sessionStorage.removeItem('tl_auth_agent');
+      setIsAdminAuthenticated(false);
+      sessionStorage.removeItem('tl_auth_admin');
+      setActiveTab('booking');
+      setEntryCodeInput('');
+      setAdminPasswordInput('');
     }
   };
 
@@ -257,12 +334,73 @@ const App: React.FC = () => {
     );
   }
 
+  // UNIFIED ENTRY LOCK SCREEN
+  if (!authenticatedAgent) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-[#001D4A] p-4 relative overflow-hidden">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-orange-500/10 rounded-full blur-[120px] animate-pulse"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px] animate-pulse"></div>
+        
+        <div className="w-full max-w-md z-10 animate-in fade-in zoom-in duration-700">
+           <div className="bg-white/5 backdrop-blur-2xl p-8 md:p-12 rounded-[48px] shadow-2xl border border-white/10">
+              <div className="flex flex-col items-center mb-10">
+                <div className="bg-white p-6 rounded-[32px] shadow-2xl mb-6 transform hover:scale-110 transition-transform duration-500">
+                  <img src={BUSINESS_INFO.logo} alt="Logo" className="w-20" />
+                </div>
+                <h1 className="text-3xl font-black text-white tracking-tighter text-center uppercase">{BUSINESS_INFO.name}</h1>
+                <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.3em] mt-2 text-center">Cloud Access Terminal</p>
+              </div>
+
+              <form onSubmit={handleEntryLogin} className="space-y-6">
+                 <div className="relative group">
+                    <i className="fas fa-shield-alt absolute left-6 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-orange-500 transition-colors"></i>
+                    <input 
+                      autoFocus
+                      type="password" 
+                      placeholder="BOOKER CODE / ADMIN PASS" 
+                      value={entryCodeInput}
+                      onChange={(e) => setEntryCodeInput(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 px-14 py-5 rounded-2xl text-white font-black text-xl tracking-widest uppercase placeholder:text-white/10 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all text-center"
+                    />
+                 </div>
+                 <button 
+                  type="submit" 
+                  className="w-full py-5 bg-orange-500 text-white rounded-2xl font-black text-lg shadow-2xl shadow-orange-500/20 hover:bg-orange-600 hover:-translate-y-1 transition-all active:scale-95"
+                 >
+                   Unlock System
+                 </button>
+              </form>
+
+              <div className="mt-12 pt-8 border-t border-white/5 flex flex-col items-center">
+                 <p className="text-white/20 text-[9px] font-bold uppercase tracking-widest text-center">Authorized Booker Code or Administrator Password Required</p>
+                 <p className="text-white/10 text-[8px] font-medium mt-2">SECURE END-TO-END ENCRYPTED SESSION</p>
+              </div>
+           </div>
+           
+           <div className="mt-8 text-center">
+             <p className="text-white/30 text-[10px] font-bold uppercase tracking-tighter">© {new Date().getFullYear()} {BUSINESS_INFO.name}</p>
+           </div>
+        </div>
+      </div>
+    );
+  }
+
   const navItems = [
     { id: 'dashboard', icon: 'fa-chart-line', label: 'Stats' },
     { id: 'booking', icon: 'fa-bus', label: 'Seats' },
+    { id: 'revenue', icon: 'fa-sack-dollar', label: 'Revenue' },
+    { id: 'expenses', icon: 'fa-file-invoice-dollar', label: 'Costs' },
     { id: 'log', icon: 'fa-clipboard-list', label: 'Log' },
     { id: 'edit', icon: 'fa-user-pen', label: 'Edit' },
   ];
+
+  const handleAdminClick = () => {
+    if (isAdminAuthenticated) {
+      setActiveTab('admin');
+    } else {
+      setShowAdminLogin(true);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans relative overflow-x-hidden">
@@ -270,26 +408,34 @@ const App: React.FC = () => {
       {/* Desktop Sidebar (Left) */}
       <nav className="hidden md:flex fixed top-0 left-0 bottom-0 w-24 bg-[#001D4A] flex-col items-center justify-between py-8 shadow-2xl z-50 border-r border-white/5">
         <div className="flex flex-col items-center w-full">
-          <img src={BUSINESS_INFO.logo} alt="Logo" className="w-14 mb-12 hover:scale-105 transition-transform" />
+          <img src={BUSINESS_INFO.logo} alt="Logo" className="w-14 mb-12 hover:scale-105 transition-transform cursor-pointer" onClick={() => setActiveTab('booking')} />
           <div className="flex flex-col w-full">
             {navItems.map(item => (
               <button 
                 key={item.id} 
                 onClick={() => setActiveTab(item.id as any)} 
-                className={`w-full py-6 flex flex-col items-center transition-all relative ${activeTab === item.id ? 'bg-orange-500 text-white' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
+                className={`w-full py-5 flex flex-col items-center justify-center transition-all relative ${activeTab === item.id ? 'bg-orange-500 text-white' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
               >
-                <i className={`fas ${item.icon} text-2xl mb-1`}></i>
-                <span className="text-[10px] font-black uppercase tracking-widest">{item.label}</span>
+                <i className={`fas ${item.icon} text-xl mb-1`}></i>
+                <span className="text-[9px] font-black uppercase tracking-widest text-center px-1 leading-none">{item.label}</span>
                 {activeTab === item.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-white/20"></div>}
               </button>
             ))}
           </div>
         </div>
         <div className="w-full flex flex-col items-center pb-4 px-2">
+          <button 
+            onClick={handleLogout}
+            className="mb-4 w-12 h-12 flex items-center justify-center rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all group relative"
+            title="Secure Logout"
+          >
+            <i className="fas fa-power-off text-lg"></i>
+          </button>
           <div className="w-full h-[1px] bg-white/10 mb-8"></div>
           <button 
-            onClick={() => setShowAdminLogin(true)} 
+            onClick={handleAdminClick} 
             className={`w-16 h-16 flex items-center justify-center rounded-[20px] transition-all ${activeTab === 'admin' ? 'bg-orange-500 text-white' : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white'}`}
+            title="Master Settings"
           >
             <i className="fas fa-user-shield text-2xl"></i>
           </button>
@@ -298,22 +444,29 @@ const App: React.FC = () => {
 
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#001D4A] flex items-center justify-around z-50 shadow-[0_-10px_30px_rgba(0,0,0,0.1)] border-t border-white/5">
-        {navItems.map(item => (
+        {navItems.slice(0, 4).map(item => (
           <button 
             key={item.id} 
             onClick={() => setActiveTab(item.id as any)} 
             className={`flex-1 h-full flex flex-col items-center justify-center transition-all ${activeTab === item.id ? 'bg-orange-500 text-white' : 'text-white/40'}`}
           >
-            <i className={`fas ${item.icon} text-xl mb-1`}></i>
-            <span className="text-[8px] font-black uppercase tracking-tighter">{item.label}</span>
+            <i className={`fas ${item.icon} text-lg mb-0.5`}></i>
+            <span className="text-[7px] font-black uppercase tracking-tighter leading-none">{item.label}</span>
           </button>
         ))}
         <button 
-          onClick={() => setShowAdminLogin(true)} 
+          onClick={handleAdminClick} 
           className={`flex-1 h-full flex flex-col items-center justify-center transition-all ${activeTab === 'admin' ? 'bg-orange-500 text-white' : 'text-white/40'}`}
         >
-          <i className="fas fa-user-shield text-xl mb-1"></i>
-          <span className="text-[8px] font-black uppercase tracking-tighter">Admin</span>
+          <i className="fas fa-user-shield text-lg mb-0.5"></i>
+          <span className="text-[7px] font-black uppercase tracking-tighter leading-none">Admin</span>
+        </button>
+        <button 
+          onClick={handleLogout} 
+          className="flex-1 h-full flex flex-col items-center justify-center transition-all text-red-500 bg-red-500/5 border-l border-white/5"
+        >
+          <i className="fas fa-power-off text-lg mb-0.5"></i>
+          <span className="text-[7px] font-black uppercase tracking-tighter leading-none">Logout</span>
         </button>
       </nav>
 
@@ -325,7 +478,7 @@ const App: React.FC = () => {
                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                 <div>
                   <h2 className="text-3xl md:text-4xl font-black text-[#001D4A] tracking-tighter">Fleet Terminal</h2>
-                  <p className="text-[10px] md:text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Live Cloud Access Enabled</p>
+                  <p className="text-[10px] md:text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Agent: <span className="text-[#001D4A] font-black">{authenticatedAgent.name}</span></p>
                 </div>
                 {buses.length > 0 && (
                   <div className="flex items-center gap-3 bg-white p-2 md:p-3 rounded-[24px] border shadow-xl w-full md:w-auto overflow-hidden">
@@ -373,14 +526,16 @@ const App: React.FC = () => {
                   <div className="w-20 h-20 md:w-24 md:h-24 bg-gray-50 rounded-full flex items-center justify-center text-gray-200 text-4xl md:text-5xl mb-8"><i className="fas fa-bus-simple"></i></div>
                   <h3 className="text-xl md:text-2xl font-black text-gray-400 uppercase tracking-widest">Fleet Terminal Offline</h3>
                   <p className="text-gray-300 mt-2 max-w-xs text-sm font-bold">Please initialize your tour routes and categories in the Admin Panel.</p>
-                  <button onClick={() => setShowAdminLogin(true)} className="mt-8 px-10 py-4 bg-[#001D4A] text-white rounded-[24px] font-black shadow-2xl hover:bg-orange-500 transition-all active:scale-95">Go to Admin</button>
+                  <button onClick={handleAdminClick} className="mt-8 px-10 py-4 bg-[#001D4A] text-white rounded-[24px] font-black shadow-2xl hover:bg-orange-500 transition-all active:scale-95">Go to Admin</button>
                 </div>
               )}
             </div>
           )}
 
-          {activeTab === 'dashboard' && <Dashboard buses={buses} />}
-          {activeTab === 'log' && <BookingLog buses={buses} />}
+          {activeTab === 'dashboard' && <Dashboard buses={buses} expenses={expenses} />}
+          {activeTab === 'log' && <BookingLog buses={buses} bookers={bookers} />}
+          {activeTab === 'expenses' && <ExpenseTracker expenses={expenses} onSubmit={handleExpenseSubmit} onDelete={handleDeleteExpense} bookers={bookers} initialAgentCode={authenticatedAgent?.code} />}
+          {activeTab === 'revenue' && <RevenueReport buses={buses} expenses={expenses} />}
           {activeTab === 'edit' && <EditData buses={buses} onUpdate={handleBookingSubmit} onDelete={triggerCancelBooking} onEdit={handleEditSeatRequest} bookers={bookers} />}
           {activeTab === 'admin' && isAdminAuthenticated && (
             <AdminPanel 
@@ -394,17 +549,27 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* Admin Login Modal */}
+      {/* Admin Verification Modal */}
       {showAdminLogin && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#001D4A]/90 backdrop-blur-md">
-           <div className="bg-white w-full max-w-sm rounded-[40px] p-8 md:p-10 shadow-2xl animate-in zoom-in duration-300">
-              <h3 className="text-2xl md:text-3xl font-black text-[#001D4A] mb-2 text-center tracking-tighter">Admin Access</h3>
-              <p className="text-[10px] font-bold text-gray-400 text-center mb-8 uppercase tracking-[0.2em]">Secure Authentication Required</p>
-              <form onSubmit={handleAdminLogin} className="space-y-6">
-                <input autoFocus type="password" placeholder="PASSWORD" value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value)} className="w-full px-6 py-4 md:py-5 bg-gray-50 border-none rounded-[20px] focus:ring-2 focus:ring-orange-500 outline-none font-black text-center text-xl" />
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[#001D4A]/90 backdrop-blur-xl">
+           <div className="bg-white w-full max-w-sm rounded-[48px] p-8 md:p-12 shadow-2xl animate-in zoom-in duration-300 border border-white/10">
+              <div className="w-20 h-20 bg-orange-50 text-orange-600 rounded-[32px] flex items-center justify-center mx-auto mb-8 text-3xl shadow-inner">
+                <i className="fas fa-lock"></i>
+              </div>
+              <h3 className="text-2xl font-black text-[#001D4A] mb-2 text-center tracking-tighter uppercase">Master Settings</h3>
+              <p className="text-[10px] font-bold text-gray-400 text-center mb-10 uppercase tracking-[0.2em]">Administrator Authentication Required</p>
+              <form onSubmit={handleAdminAuth} className="space-y-6">
+                <input 
+                  autoFocus 
+                  type="password" 
+                  placeholder="ADMIN PASSWORD" 
+                  value={adminPasswordInput} 
+                  onChange={(e) => setAdminPasswordInput(e.target.value)} 
+                  className="w-full px-6 py-5 bg-gray-50 border-none rounded-[24px] focus:ring-2 focus:ring-orange-500 outline-none font-black text-center text-xl tracking-widest placeholder:text-gray-200" 
+                />
                 <div className="flex gap-4">
-                  <button type="button" onClick={() => setShowAdminLogin(false)} className="flex-1 py-4 text-gray-500 font-bold hover:bg-gray-100 rounded-[20px] transition-all">Cancel</button>
-                  <button type="submit" className="flex-1 py-4 bg-orange-500 text-white rounded-[20px] font-black shadow-xl hover:bg-orange-600 transition-all active:scale-95">Unlock</button>
+                  <button type="button" onClick={() => setShowAdminLogin(false)} className="flex-1 py-4 text-gray-400 font-black text-sm uppercase">Cancel</button>
+                  <button type="submit" className="flex-1 py-4 bg-orange-500 text-white rounded-[24px] font-black shadow-xl shadow-orange-100 hover:bg-orange-600 transition-all active:scale-95">Unlock</button>
                 </div>
               </form>
            </div>

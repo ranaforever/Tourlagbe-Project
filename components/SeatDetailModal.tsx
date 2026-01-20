@@ -1,7 +1,8 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { BookingInfo } from '../types';
 import { BUSINESS_INFO } from '../constants';
+import PaymentModal from './PaymentModal';
 
 interface SeatDetailModalProps {
   info: BookingInfo;
@@ -13,51 +14,30 @@ interface SeatDetailModalProps {
 
 const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit, onCancel, onUpdate }) => {
   const ticketRef = useRef<HTMLDivElement>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   // Generate QR Code URL based on booking info
   const qrData = `ID:${info.id}|Seat:${info.seatNo}|Name:${info.name}|Tour:${info.tourName}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
 
-  const handlePayDue = async () => {
-    const code = prompt(`SECURITY VERIFICATION\n\nPlease enter the Agent Code (${info.bookerCode}) to authorize this payment:`);
-    if (code === null) return; // Cancelled
-    
-    if (code.toUpperCase() !== info.bookerCode.toUpperCase()) {
-      alert("Verification Failed: Unauthorized Agent Code.");
-      return;
-    }
-
-    const amountStr = prompt(`Current Due: ৳${info.dueAmount}\n\nEnter the payment amount to pay:`, info.dueAmount.toString());
-    if (amountStr === null) return; // Cancelled
-
-    const amount = parseFloat(amountStr);
-
-    if (!isNaN(amount) && amount > 0) {
-      if (amount > info.dueAmount) {
-        alert(`Error: Payment amount (৳${amount}) cannot exceed the remaining due (৳${info.dueAmount}).`);
-        return;
+  const handleProcessPayment = async (amount: number) => {
+    if (onUpdate) {
+      const newAdvance = info.advanceAmount + amount;
+      const newDue = info.dueAmount - amount;
+      const updatedInfo: BookingInfo = {
+        ...info,
+        advanceAmount: newAdvance,
+        dueAmount: newDue,
+        paymentStatus: newDue <= 0 ? 'Paid' : 'Partial'
+      };
+      
+      try {
+        await onUpdate(updatedInfo);
+        setShowPaymentModal(false);
+      } catch (error) {
+        console.error("Update failed:", error);
+        alert("Could not process payment. Please try again.");
       }
-
-      if (onUpdate) {
-        const newAdvance = info.advanceAmount + amount;
-        const newDue = info.dueAmount - amount;
-        const updatedInfo: BookingInfo = {
-          ...info,
-          advanceAmount: newAdvance,
-          dueAmount: newDue,
-          paymentStatus: newDue <= 0 ? 'Paid' : 'Partial'
-        };
-        
-        try {
-          await onUpdate(updatedInfo);
-          alert(`Success! ৳${amount} has been received. Remaining due: ৳${newDue}`);
-        } catch (error) {
-          console.error("Update failed:", error);
-          alert("Could not process payment. Please try again.");
-        }
-      }
-    } else {
-      alert("Error: Please enter a valid payment amount greater than zero.");
     }
   };
 
@@ -140,127 +120,137 @@ const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-[#001D4A]/80 backdrop-blur-md overflow-y-auto">
-      <div className="bg-white w-full max-w-xl rounded-[40px] shadow-2xl my-auto animate-in zoom-in duration-300 overflow-hidden border border-white/20">
-        
-        <div className="p-4 md:p-8">
-           <div className="flex justify-between items-start mb-6 px-2">
-              <div>
-                <span className="text-[10px] font-black text-white bg-indigo-600 px-4 py-1 rounded-full uppercase mb-3 inline-block tracking-widest shadow-lg">Cloud Registry</span>
-                <h3 className="text-3xl md:text-5xl font-black text-[#001D4A] tracking-tighter leading-none truncate max-w-[300px]">{info.name}</h3>
-              </div>
-              <button onClick={onClose} className="w-10 h-10 md:w-12 md:h-12 bg-gray-50 rounded-full flex items-center justify-center hover:bg-gray-100 transition-all text-gray-400 active:scale-90">
-                <i className="fas fa-times text-xl"></i>
-              </button>
-           </div>
-
-           {/* Ticket Design */}
-           <div ref={ticketRef} className="bg-white border-2 border-dashed border-gray-200 rounded-[30px] md:rounded-[40px] p-6 md:p-8 mb-8 relative overflow-hidden shadow-sm">
-              <div className="absolute -left-5 top-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full border-r-2 border-dashed border-gray-200 z-10"></div>
-              <div className="absolute -right-5 top-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full border-l-2 border-dashed border-gray-200 z-10"></div>
-              
-              <div className="flex justify-between items-start mb-8">
-                 <div>
-                    <img src={BUSINESS_INFO.logo} alt="Logo" className="h-10 md:h-12 mb-3" />
-                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest max-w-[200px] leading-relaxed">
-                      {BUSINESS_INFO.address}
-                    </p>
-                 </div>
-                 <div className="text-right">
-                    <div className="bg-[#001D4A] text-white px-5 py-2 md:px-6 md:py-3 rounded-2xl flex flex-col items-center shadow-xl shadow-indigo-100/50">
-                      <span className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Seat</span>
-                      <span className="text-2xl md:text-4xl font-black leading-none">{info.seatNo}</span>
-                    </div>
-                 </div>
-              </div>
-
-              <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-center border-t border-dashed border-gray-100 pt-6">
-                 <div className="flex-grow grid grid-cols-2 gap-y-6 md:gap-y-8 gap-x-4 w-full text-left">
-                    <div>
-                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Route</p>
-                        <p className="text-sm md:text-base font-black text-[#001D4A] truncate">{info.tourName}</p>
-                    </div>
-                    <div>
-                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Contact</p>
-                        <p className="text-sm md:text-base font-black text-gray-700">+880{info.mobile}</p>
-                    </div>
-                    <div>
-                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Advanced</p>
-                        <p className="text-sm md:text-base font-black text-green-600">৳{info.advanceAmount.toLocaleString()}</p>
-                    </div>
-                    <div>
-                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</p>
-                        <p className={`text-sm md:text-base font-black uppercase tracking-widest ${info.paymentStatus === 'Paid' ? 'text-green-600' : 'text-orange-500'}`}>
-                          {info.paymentStatus}
-                        </p>
-                    </div>
-                 </div>
-                 
-                 <div className="shrink-0 flex flex-col items-center">
-                    <img src={qrCodeUrl} alt="QR" className="w-24 h-24 md:w-28 md:h-28" />
-                    <p className="text-[8px] font-black text-gray-300 uppercase mt-2 tracking-tighter">ID: {info.id}</p>
-                 </div>
-              </div>
-
-              <div className="border-t border-dashed border-gray-100 my-6 pt-6 flex justify-between items-end">
-                 <div className="text-left">
-                    <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Agent Details</p>
-                    <p className="text-[12px] md:text-sm font-black text-gray-800 uppercase leading-none">{info.bookedBy} ({info.bookerCode})</p>
-                 </div>
-                 <div className="text-right">
-                    {info.dueAmount > 0 && (
-                      <div>
-                        <p className="text-[9px] md:text-[10px] font-black text-red-400 uppercase tracking-widest mb-1">Remaining Due</p>
-                        <p className="text-2xl md:text-3xl font-black text-red-600 leading-none">৳{info.dueAmount.toLocaleString()}</p>
-                      </div>
-                    )}
-                 </div>
-              </div>
-           </div>
-
-           {/* High-Performance Action Grid */}
-           <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <button 
-                  onClick={printTicket}
-                  className="py-4 md:py-5 bg-[#312e81] text-white rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base hover:bg-indigo-900 shadow-xl shadow-indigo-100 flex items-center justify-center gap-2 transition-all active:scale-95"
-                >
-                  <i className="fas fa-print"></i> Print
+    <>
+      <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-[#001D4A]/80 backdrop-blur-md overflow-y-auto">
+        <div className="bg-white w-full max-w-xl rounded-[40px] shadow-2xl my-auto animate-in zoom-in duration-300 overflow-hidden border border-white/20">
+          
+          <div className="p-4 md:p-8">
+             <div className="flex justify-between items-start mb-6 px-2">
+                <div>
+                  <span className="text-[10px] font-black text-white bg-indigo-600 px-4 py-1 rounded-full uppercase mb-3 inline-block tracking-widest shadow-lg">Cloud Registry</span>
+                  <h3 className="text-3xl md:text-5xl font-black text-[#001D4A] tracking-tighter leading-none truncate max-w-[300px]">{info.name}</h3>
+                </div>
+                <button onClick={onClose} className="w-10 h-10 md:w-12 md:h-12 bg-gray-50 rounded-full flex items-center justify-center hover:bg-gray-100 transition-all text-gray-400 active:scale-90">
+                  <i className="fas fa-times text-xl"></i>
                 </button>
+             </div>
 
-                <button 
-                  onClick={handleShareTicket}
-                  className="py-4 md:py-5 bg-[#10a342] text-white rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base hover:bg-green-700 shadow-xl shadow-green-100 flex items-center justify-center gap-2 transition-all active:scale-95"
-                >
-                  <i className="fas fa-share-nodes"></i> Share
-                </button>
+             {/* Ticket Design */}
+             <div ref={ticketRef} className="bg-white border-2 border-dashed border-gray-200 rounded-[30px] md:rounded-[40px] p-6 md:p-8 mb-8 relative overflow-hidden shadow-sm">
+                <div className="absolute -left-5 top-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full border-r-2 border-dashed border-gray-200 z-10"></div>
+                <div className="absolute -right-5 top-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full border-l-2 border-dashed border-gray-200 z-10"></div>
                 
-                <button 
-                  onClick={onEdit}
-                  className="py-4 md:py-5 bg-[#eef5ff] text-[#3b82f6] rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base hover:bg-blue-100 flex items-center justify-center gap-2 transition-all active:scale-95"
-                >
-                  <i className="fas fa-user-edit"></i> Edit
-                </button>
+                <div className="flex justify-between items-start mb-8">
+                   <div>
+                      <img src={BUSINESS_INFO.logo} alt="Logo" className="h-10 md:h-12 mb-3" />
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest max-w-[200px] leading-relaxed">
+                        {BUSINESS_INFO.address}
+                      </p>
+                   </div>
+                   <div className="text-right">
+                      <div className="bg-[#001D4A] text-white px-5 py-2 md:px-6 md:py-3 rounded-2xl flex flex-col items-center shadow-xl shadow-indigo-100/50">
+                        <span className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Seat</span>
+                        <span className="text-2xl md:text-4xl font-black leading-none">{info.seatNo}</span>
+                      </div>
+                   </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-center border-t border-dashed border-gray-100 pt-6">
+                   <div className="flex-grow grid grid-cols-2 gap-y-6 md:gap-y-8 gap-x-4 w-full text-left">
+                      <div>
+                          <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Route</p>
+                          <p className="text-sm md:text-base font-black text-[#001D4A] truncate">{info.tourName}</p>
+                      </div>
+                      <div>
+                          <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Contact</p>
+                          <p className="text-sm md:text-base font-black text-gray-700">+880{info.mobile}</p>
+                      </div>
+                      <div>
+                          <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Advanced</p>
+                          <p className="text-sm md:text-base font-black text-green-600">৳{info.advanceAmount.toLocaleString()}</p>
+                      </div>
+                      <div>
+                          <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</p>
+                          <p className={`text-sm md:text-base font-black uppercase tracking-widest ${info.paymentStatus === 'Paid' ? 'text-green-600' : 'text-orange-500'}`}>
+                            {info.paymentStatus}
+                          </p>
+                      </div>
+                   </div>
+                   
+                   <div className="shrink-0 flex flex-col items-center">
+                      <img src={qrCodeUrl} alt="QR" className="w-24 h-24 md:w-28 md:h-28" />
+                      <p className="text-[8px] font-black text-gray-300 uppercase mt-2 tracking-tighter">ID: {info.id}</p>
+                   </div>
+                </div>
+
+                <div className="border-t border-dashed border-gray-100 my-6 pt-6 flex justify-between items-end">
+                   <div className="text-left">
+                      <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Agent Details</p>
+                      <p className="text-[12px] md:text-sm font-black text-gray-800 uppercase leading-none">{info.bookedBy} ({info.bookerCode})</p>
+                   </div>
+                   <div className="text-right">
+                      {info.dueAmount > 0 && (
+                        <div>
+                          <p className="text-[9px] md:text-[10px] font-black text-red-400 uppercase tracking-widest mb-1">Remaining Due</p>
+                          <p className="text-2xl md:text-3xl font-black text-red-600 leading-none">৳{info.dueAmount.toLocaleString()}</p>
+                        </div>
+                      )}
+                   </div>
+                </div>
+             </div>
+
+             {/* High-Performance Action Grid */}
+             <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <button 
+                    onClick={printTicket}
+                    className="py-4 md:py-5 bg-[#312e81] text-white rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base hover:bg-indigo-900 shadow-xl shadow-indigo-100 flex items-center justify-center gap-2 transition-all active:scale-95"
+                  >
+                    <i className="fas fa-print"></i> Print
+                  </button>
+
+                  <button 
+                    onClick={handleShareTicket}
+                    className="py-4 md:py-5 bg-[#10a342] text-white rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base hover:bg-green-700 shadow-xl shadow-green-100 flex items-center justify-center gap-2 transition-all active:scale-95"
+                  >
+                    <i className="fas fa-share-nodes"></i> Share
+                  </button>
+                  
+                  <button 
+                    onClick={onEdit}
+                    className="py-4 md:py-5 bg-[#eef5ff] text-[#3b82f6] rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base hover:bg-blue-100 flex items-center justify-center gap-2 transition-all active:scale-95"
+                  >
+                    <i className="fas fa-user-edit"></i> Edit
+                  </button>
+
+                  <button 
+                    onClick={() => setShowPaymentModal(true)}
+                    disabled={info.dueAmount <= 0}
+                    className={`py-4 md:py-5 rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl ${info.dueAmount > 0 ? 'bg-[#ff7a1a] text-white hover:bg-orange-600 shadow-orange-100' : 'bg-gray-100 text-gray-300 cursor-not-allowed shadow-none'}`}
+                  >
+                    <i className="fas fa-money-bill-wave"></i> Due Pay ৳{info.dueAmount}
+                  </button>
+                </div>
 
                 <button 
-                  onClick={handlePayDue}
-                  disabled={info.dueAmount <= 0}
-                  className={`py-4 md:py-5 rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl ${info.dueAmount > 0 ? 'bg-[#ff7a1a] text-white hover:bg-orange-600 shadow-orange-100' : 'bg-gray-100 text-gray-300 cursor-not-allowed shadow-none'}`}
+                  onClick={onCancel}
+                  className="w-full py-4 bg-[#fff1f1] text-red-500 rounded-[32px] md:rounded-[40px] font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95 flex items-center justify-center gap-2"
                 >
-                  <i className="fas fa-money-bill-wave"></i> Due Pay ৳{info.dueAmount}
+                  <i className="fas fa-trash-alt"></i> Cancel Booking Permanently
                 </button>
-              </div>
-
-              <button 
-                onClick={onCancel}
-                className="w-full py-4 bg-[#fff1f1] text-red-500 rounded-[32px] md:rounded-[40px] font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95 flex items-center justify-center gap-2"
-              >
-                <i className="fas fa-trash-alt"></i> Cancel Booking Permanently
-              </button>
-           </div>
+             </div>
+          </div>
         </div>
       </div>
-    </div>
+
+      {showPaymentModal && (
+        <PaymentModal 
+          info={info} 
+          onClose={() => setShowPaymentModal(false)} 
+          onConfirm={handleProcessPayment} 
+        />
+      )}
+    </>
   );
 };
 

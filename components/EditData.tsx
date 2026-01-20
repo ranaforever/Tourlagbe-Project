@@ -10,18 +10,8 @@ interface EditDataProps {
   bookers: Booker[];
 }
 
-const EditData: React.FC<EditDataProps> = ({ buses, onUpdate, onDelete, onEdit, bookers }) => {
-  const [accessCode, setAccessCode] = useState('');
-  const [isUnlocked, setIsUnlocked] = useState(false);
+const EditData: React.FC<EditDataProps> = ({ buses, onUpdate, onDelete, onEdit }) => {
   const [searchQuery, setSearchQuery] = useState('');
-
-  const handleUnlock = () => {
-    if (bookers.some(b => b.code.toUpperCase() === accessCode.toUpperCase())) {
-      setIsUnlocked(true);
-    } else {
-      alert("Unauthorized Agent Code!");
-    }
-  };
 
   const allBookings: BookingInfo[] = buses.flatMap(b => b.seats.filter(s => s.isBooked).map(s => s.bookingInfo!));
   const filtered = allBookings.filter(b => 
@@ -29,30 +19,6 @@ const EditData: React.FC<EditDataProps> = ({ buses, onUpdate, onDelete, onEdit, 
     b.mobile.includes(searchQuery) ||
     b.seatNo.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  if (!isUnlocked) {
-    return (
-      <div className="max-w-md mx-auto mt-20 bg-white p-10 rounded-[40px] shadow-2xl border text-center animate-in zoom-in duration-300">
-        <div className="w-24 h-24 bg-indigo-50 text-indigo-600 rounded-[32px] flex items-center justify-center mx-auto mb-8 text-4xl shadow-inner border border-indigo-100">
-          <i className="fas fa-user-lock"></i>
-        </div>
-        <h3 className="text-3xl font-black text-[#001D4A] mb-3">Agent Portal</h3>
-        <p className="text-sm text-gray-500 mb-10 leading-relaxed">Enter your agent code to modify existing booking entries.</p>
-        <div className="space-y-4">
-           <input 
-            type="text" 
-            placeholder="AGENT-CODE" 
-            className="w-full px-8 py-5 bg-gray-50 border-none rounded-2xl outline-none focus:ring-4 focus:ring-indigo-100 transition-all font-black text-center text-xl tracking-widest uppercase"
-            value={accessCode}
-            onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
-          />
-          <button onClick={handleUnlock} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 active:scale-95">
-            Unlock Editor
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="animate-in fade-in duration-500 max-w-6xl mx-auto md:pl-12">
@@ -122,7 +88,8 @@ const EditData: React.FC<EditDataProps> = ({ buses, onUpdate, onDelete, onEdit, 
                     onClick={() => {
                       const code = prompt("Security Check: Enter Agent Booker Code to settle this balance:");
                       if (code && code.toUpperCase() === booking.bookerCode.toUpperCase()) {
-                        const newAdvance = Number(prompt("Update Payment (Current: ৳" + booking.advanceAmount + ")", (booking.advanceAmount + booking.dueAmount).toString()));
+                        const newAdvanceInput = prompt("Update Payment (Current: ৳" + booking.advanceAmount + ")", (booking.advanceAmount + booking.dueAmount).toString());
+                        const newAdvance = Number(newAdvanceInput);
                         if (!isNaN(newAdvance) && newAdvance >= 0) {
                           const total = booking.tourFees + (booking.customerTypeFees || 0);
                           const due = total - booking.discountAmount - newAdvance;
