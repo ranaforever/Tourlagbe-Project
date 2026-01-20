@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Expense, Booker } from '../types';
+import React, { useState, useMemo } from 'react';
+import { Expense, Booker, Tour } from '../types';
 
 interface ExpenseTrackerProps {
   expenses: Expense[];
@@ -8,6 +8,7 @@ interface ExpenseTrackerProps {
   onDelete: (id: string) => void;
   bookers: Booker[];
   initialAgentCode?: string;
+  tours: Tour[];
 }
 
 const EXPENSE_CATEGORIES = [
@@ -22,14 +23,22 @@ const EXPENSE_CATEGORIES = [
   'Others'
 ];
 
-const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onDelete, bookers, initialAgentCode }) => {
+const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onDelete, bookers, initialAgentCode, tours }) => {
   const [formData, setFormData] = useState({
     category: EXPENSE_CATEGORIES[0],
     amount: '',
     description: '',
     date: new Date().toISOString().split('T')[0],
-    agentCode: initialAgentCode || ''
+    agentCode: initialAgentCode || '',
+    tourName: '' // Default to no specific tour
   });
+
+  const [listFilterTour, setListFilterTour] = useState('');
+
+  const filteredExpenses = useMemo(() => {
+    if (!listFilterTour) return expenses;
+    return expenses.filter(ex => ex.tourName === listFilterTour);
+  }, [expenses, listFilterTour]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +52,8 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
           description: formData.description,
           date: formData.date,
           recordedBy: 'System Administrator',
-          agentCode: 'ADMIN'
+          agentCode: 'ADMIN',
+          tourName: formData.tourName || undefined
         };
         onSubmit(newExpense);
         setFormData({ ...formData, amount: '', description: '' });
@@ -63,7 +73,8 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
       description: formData.description,
       date: formData.date,
       recordedBy: booker.name,
-      agentCode: booker.code
+      agentCode: booker.code,
+      tourName: formData.tourName || undefined
     };
 
     onSubmit(newExpense);
@@ -86,15 +97,28 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Category</label>
-              <select 
-                value={formData.category}
-                onChange={e => setFormData({...formData, category: e.target.value})}
-                className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl font-black text-[#001D4A] outline-none appearance-none cursor-pointer"
-              >
-                {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Category</label>
+                <select 
+                  value={formData.category}
+                  onChange={e => setFormData({...formData, category: e.target.value})}
+                  className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl font-black text-[#001D4A] outline-none appearance-none cursor-pointer"
+                >
+                  {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Tour Route</label>
+                <select 
+                  value={formData.tourName}
+                  onChange={e => setFormData({...formData, tourName: e.target.value})}
+                  className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl font-black text-indigo-600 outline-none appearance-none cursor-pointer"
+                >
+                  <option value="">General / Office</option>
+                  {tours.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+                </select>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -153,23 +177,42 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
         {/* List Section */}
         <div className="lg:col-span-7 space-y-6">
           <div className="bg-white p-8 rounded-[40px] shadow-xl border border-gray-100 overflow-hidden">
-             <div className="flex justify-between items-center mb-8">
-               <h3 className="text-xl font-black text-[#001D4A] uppercase tracking-tighter">Recent Outflows</h3>
-               <span className="bg-red-50 text-red-500 px-4 py-1 rounded-full text-[10px] font-black uppercase">Total Recorded: ৳{expenses.reduce((acc, curr) => acc + curr.amount, 0).toLocaleString()}</span>
+             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+               <div>
+                  <h3 className="text-xl font-black text-[#001D4A] uppercase tracking-tighter">Recent Outflows</h3>
+                  <p className="text-[10px] font-black text-gray-400 uppercase mt-1">Total: ৳{filteredExpenses.reduce((acc, curr) => acc + curr.amount, 0).toLocaleString()}</p>
+               </div>
+               <div className="relative">
+                  <select 
+                    value={listFilterTour} 
+                    onChange={e => setListFilterTour(e.target.value)}
+                    className="pl-4 pr-10 py-2 bg-gray-50 border-none rounded-xl text-xs font-black text-indigo-600 outline-none appearance-none cursor-pointer"
+                  >
+                    <option value="">All Route Costs</option>
+                    <option value="General">General/Office</option>
+                    {tours.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+                  </select>
+                  <i className="fas fa-filter absolute right-3 top-1/2 -translate-y-1/2 text-indigo-300 pointer-events-none text-[10px]"></i>
+               </div>
              </div>
 
              <div className="space-y-4 max-h-[500px] overflow-y-auto no-scrollbar pr-2">
-                {expenses.length === 0 ? (
-                  <div className="text-center py-20 text-gray-300 italic font-bold">No expenses found.</div>
+                {filteredExpenses.length === 0 ? (
+                  <div className="text-center py-20 text-gray-300 italic font-bold">No expenses found matching filter.</div>
                 ) : (
-                  expenses.map(ex => (
+                  filteredExpenses.map(ex => (
                     <div key={ex.id} className="group flex items-center justify-between p-5 bg-gray-50 hover:bg-white hover:shadow-xl transition-all rounded-[24px] border border-transparent hover:border-red-100">
                        <div className="flex items-center gap-4">
                           <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-red-400 group-hover:bg-red-500 group-hover:text-white transition-colors">
                              <i className="fas fa-receipt"></i>
                           </div>
                           <div>
-                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">{ex.category}</p>
+                             <div className="flex items-center gap-2 mb-1">
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">{ex.category}</p>
+                                {ex.tourName && (
+                                  <span className="text-[7px] font-black bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded uppercase">{ex.tourName}</span>
+                                )}
+                             </div>
                              <p className="font-black text-[#001D4A] text-sm">{ex.description || 'No description'}</p>
                              <div className="flex items-center gap-2 mt-1">
                                 <p className="text-[9px] text-gray-300 font-bold uppercase">{new Date(ex.date).toLocaleDateString()} • {ex.recordedBy}</p>

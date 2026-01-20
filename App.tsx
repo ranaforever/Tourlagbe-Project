@@ -95,7 +95,8 @@ const App: React.FC = () => {
         description: e.description,
         date: e.date,
         recordedBy: e.recorded_by,
-        agentCode: e.agent_code || 'ADMIN' // Default to admin if missing
+        agentCode: e.agent_code || 'ADMIN',
+        tourName: e.tour_name // Map tour_name from database
       }));
 
       setTours(fetchedTours);
@@ -174,7 +175,8 @@ const App: React.FC = () => {
         description: expense.description,
         date: expense.date,
         recorded_by: expense.recordedBy,
-        agent_code: expense.agentCode
+        agent_code: expense.agentCode,
+        tour_name: expense.tourName // Sync tour_name to database
       });
       if (error) throw error;
       fetchData();
@@ -455,8 +457,8 @@ const App: React.FC = () => {
           )}
           {activeTab === 'dashboard' && <Dashboard buses={buses} expenses={expenses} />}
           {activeTab === 'log' && <BookingLog buses={buses} bookers={bookers} />}
-          {activeTab === 'expenses' && <ExpenseTracker expenses={expenses} onSubmit={handleExpenseSubmit} onDelete={handleDeleteExpense} bookers={bookers} initialAgentCode={authenticatedAgent?.code} />}
-          {activeTab === 'revenue' && <RevenueReport buses={buses} expenses={expenses} />}
+          {activeTab === 'expenses' && <ExpenseTracker expenses={expenses} onSubmit={handleExpenseSubmit} onDelete={handleDeleteExpense} bookers={bookers} initialAgentCode={authenticatedAgent?.code} tours={tours} />}
+          {activeTab === 'revenue' && <RevenueReport buses={buses} expenses={expenses} tours={tours} />}
           {activeTab === 'edit' && <EditData buses={buses} onUpdate={handleBookingSubmit} onDelete={triggerCancelBooking} onEdit={handleEditSeatRequest} bookers={bookers} />}
           {activeTab === 'admin' && isAdminAuthenticated && <AdminPanel tours={tours} setTours={syncAdminTours} agents={bookers} setAgents={syncAdminAgents} customerTypes={customerTypes} setCustomerTypes={syncAdminTypes} buses={buses} onSeed={seedDatabase} />}
         </div>

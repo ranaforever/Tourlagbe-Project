@@ -43,6 +43,7 @@ export interface Expense {
   date: string;
   recordedBy: string;
   agentCode: string;
+  tourName?: string; // New field for tour-wise tracking
 }
 
 export interface SeatData {
