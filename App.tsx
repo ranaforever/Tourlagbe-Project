@@ -257,7 +257,14 @@ const App: React.FC = () => {
 
   const handleEditSeatRequest = (info: BookingInfo) => {
     setShowDetailModal(false);
-    setSecurityModal({ isOpen: true, targetInfo: info, action: 'edit' });
+    // Bypassing security code if admin
+    if (isAdminAuthenticated) {
+      setEditingInfo(info);
+      setSelectedSeatId(info.seatNo);
+      setShowBookingModal(true);
+    } else {
+      setSecurityModal({ isOpen: true, targetInfo: info, action: 'edit' });
+    }
   };
 
   const triggerCancelBooking = (busId: string, seatId: string) => {
@@ -265,7 +272,13 @@ const App: React.FC = () => {
     const seat = bus?.seats.find(s => s.id === seatId);
     if (seat?.bookingInfo) {
       setShowDetailModal(false);
-      setSecurityModal({ isOpen: true, targetInfo: seat.bookingInfo, action: 'delete' });
+      // Bypassing security code if admin
+      if (isAdminAuthenticated) {
+        setSeatToDeselect({ busId, seatId });
+        setShowConfirmDeselect(true);
+      } else {
+        setSecurityModal({ isOpen: true, targetInfo: seat.bookingInfo, action: 'delete' });
+      }
     }
   };
 
@@ -482,7 +495,7 @@ const App: React.FC = () => {
 
       {securityModal?.isOpen && <SecurityModal info={securityModal.targetInfo} action={securityModal.action} onClose={() => setSecurityModal(null)} onVerify={handleSecurityVerify} />}
       {showBookingModal && <BookingModal seatId={selectedSeatId!} busNo={editingInfo ? editingInfo.busNo : (buses[selectedBusIndex]?.busId || '')} onClose={() => { setShowBookingModal(false); setEditingInfo(null); }} onSubmit={handleBookingSubmit} tours={tours} bookers={bookers} customerTypes={customerTypes} existingData={editingInfo || undefined} />}
-      {showDetailModal && editingInfo && <SeatDetailModal info={editingInfo} onClose={() => { setShowDetailModal(false); setEditingInfo(null); }} onEdit={() => handleEditSeatRequest(editingInfo)} onCancel={() => triggerCancelBooking(editingInfo.busNo, editingInfo.seatNo)} onUpdate={handleBookingSubmit} />}
+      {showDetailModal && editingInfo && <SeatDetailModal info={editingInfo} onClose={() => { setShowDetailModal(false); setEditingInfo(null); }} onEdit={() => handleEditSeatRequest(editingInfo)} onCancel={() => triggerCancelBooking(editingInfo.busNo, editingInfo.seatNo)} onUpdate={handleBookingSubmit} isAdmin={isAdminAuthenticated} />}
       {showConfirmDeselect && <ConfirmationDialog message="Are you sure you want to cancel this booking permanently?" onConfirm={confirmDeselect} onCancel={() => setShowConfirmDeselect(false)} />}
     </div>
   );

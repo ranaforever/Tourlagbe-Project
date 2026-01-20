@@ -6,10 +6,12 @@ interface PaymentModalProps {
   info: BookingInfo;
   onClose: () => void;
   onConfirm: (amount: number) => void;
+  isAdmin?: boolean;
 }
 
-const PaymentModal: React.FC<PaymentModalProps> = ({ info, onClose, onConfirm }) => {
-  const [step, setStep] = useState<'verify' | 'amount'>('verify');
+const PaymentModal: React.FC<PaymentModalProps> = ({ info, onClose, onConfirm, isAdmin }) => {
+  // If admin, start directly at the 'amount' step
+  const [step, setStep] = useState<'verify' | 'amount'>(isAdmin ? 'amount' : 'verify');
   const [code, setCode] = useState('');
   const [amount, setAmount] = useState<string>(info.dueAmount.toString());
 
@@ -98,7 +100,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ info, onClose, onConfirm })
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setStep('verify')} className="flex-1 py-4 text-gray-400 font-black text-sm uppercase">Back</button>
+                <button type="button" onClick={() => !isAdmin ? setStep('verify') : onClose()} className="flex-1 py-4 text-gray-400 font-black text-sm uppercase">{!isAdmin ? 'Back' : 'Cancel'}</button>
                 <button type="submit" className="flex-1 py-4 bg-green-600 text-white rounded-2xl font-black text-sm uppercase shadow-xl shadow-green-100 active:scale-95 transition-all">Confirm Pay</button>
               </div>
             </form>

@@ -10,9 +10,10 @@ interface SeatDetailModalProps {
   onEdit: () => void;
   onCancel: () => void;
   onUpdate?: (updatedInfo: BookingInfo) => void;
+  isAdmin?: boolean;
 }
 
-const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit, onCancel, onUpdate }) => {
+const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit, onCancel, onUpdate, isAdmin }) => {
   const ticketRef = useRef<HTMLDivElement>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
@@ -248,6 +249,7 @@ const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit
           info={info} 
           onClose={() => setShowPaymentModal(false)} 
           onConfirm={handleProcessPayment} 
+          isAdmin={isAdmin}
         />
       )}
     </>

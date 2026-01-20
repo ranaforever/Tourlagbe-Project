@@ -44,8 +44,13 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
     const cFee = cType ? cType.fee : 0;
     setCustomerTypeFees(cFee);
 
-    const booker = bookers.find(b => b.code.toUpperCase() === formData.bookerCode.toUpperCase());
-    setBookerName(booker ? booker.name : '');
+    // Recognising ADMIN as a master code
+    if (formData.bookerCode.toUpperCase() === 'ADMIN' || formData.bookerCode === '@Rana&01625@') {
+       setBookerName('System Administrator');
+    } else {
+       const booker = bookers.find(b => b.code.toUpperCase() === formData.bookerCode.toUpperCase());
+       setBookerName(booker ? booker.name : '');
+    }
 
     const total = fee + cFee;
     const due = total - formData.discountAmount - formData.advanceAmount;
