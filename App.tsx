@@ -15,7 +15,6 @@ import { supabase } from './supabase';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'booking' | 'dashboard' | 'log' | 'edit' | 'admin'>('booking');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [showAdminLogin, setShowAdminLogin] = useState(false);
@@ -48,9 +47,6 @@ const App: React.FC = () => {
         supabase.from('tl_customer_types').select('*').order('type'),
         supabase.from('tl_bookings').select('*')
       ]);
-
-      if (toursRes.error) console.error("Tours Error:", toursRes.error);
-      if (bookersRes.error) console.error("Agents Error:", bookersRes.error);
 
       const fetchedTours = toursRes.data || [];
       const fetchedBookers = bookersRes.data || [];
@@ -97,7 +93,7 @@ const App: React.FC = () => {
       });
       setBuses(busLayouts);
     } catch (error) {
-      console.error("Critical Cloud Fetch Error:", error);
+      console.error("Fetch Error:", error);
     } finally {
       setIsLoading(false);
     }
@@ -105,7 +101,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-    const channel = supabase.channel('tl_realtime_v2')
+    const channel = supabase.channel('tl_realtime_v3')
       .on('postgres_changes', { event: '*', schema: 'public' }, () => {
         fetchData();
       })
@@ -139,12 +135,10 @@ const App: React.FC = () => {
       if (error) throw error;
       fetchData();
     } catch (error) {
-      alert("Booking failed. Please check your cloud connection.");
+      alert("Sync failed.");
     }
     setShowBookingModal(false);
     setShowDetailModal(false);
-    setSelectedSeatId(null);
-    setEditingInfo(null);
   };
 
   const confirmDeselect = async () => {
@@ -153,72 +147,48 @@ const App: React.FC = () => {
       const seat = bus?.seats.find(s => s.id === seatToDeselect.seatId);
       if (seat?.bookingInfo) {
         try {
-          const { error } = await supabase.from('tl_bookings').delete().eq('id', seat.bookingInfo.id);
-          if (error) throw error;
+          await supabase.from('tl_bookings').delete().eq('id', seat.bookingInfo.id);
           fetchData();
         } catch (error) {
-          alert("Cancellation failed.");
+          alert("Cancel failed.");
         }
       }
     }
     setShowConfirmDeselect(false);
-    setSeatToDeselect(null);
   };
 
   const syncAdminTours = async (newTours: Tour[]) => {
-    try {
-      await supabase.from('tl_tours').delete().neq('name', '___'); 
-      if (newTours.length > 0) {
-        const { error } = await supabase.from('tl_tours').insert(newTours);
-        if (error) throw error;
-      }
-      fetchData();
-    } catch (e) { alert("Failed to sync tours."); }
+    await supabase.from('tl_tours').delete().neq('name', '___'); 
+    if (newTours.length > 0) await supabase.from('tl_tours').insert(newTours);
+    fetchData();
   };
 
   const syncAdminAgents = async (newAgents: Booker[]) => {
-    try {
-      await supabase.from('tl_agents').delete().neq('code', '___');
-      if (newAgents.length > 0) {
-        const { error } = await supabase.from('tl_agents').insert(newAgents);
-        if (error) throw error;
-      }
-      fetchData();
-    } catch (e) { alert("Failed to sync agents."); }
+    await supabase.from('tl_agents').delete().neq('code', '___');
+    if (newAgents.length > 0) await supabase.from('tl_agents').insert(newAgents);
+    fetchData();
   };
 
   const syncAdminTypes = async (newTypes: CustomerType[]) => {
-    try {
-      await supabase.from('tl_customer_types').delete().neq('type', '___');
-      if (newTypes.length > 0) {
-        const { error } = await supabase.from('tl_customer_types').insert(newTypes);
-        if (error) throw error;
-      }
-      fetchData();
-    } catch (e) { alert("Failed to sync categories."); }
+    await supabase.from('tl_customer_types').delete().neq('type', '___');
+    if (newTypes.length > 0) await supabase.from('tl_customer_types').insert(newTypes);
+    fetchData();
   };
 
   const seedDatabase = async () => {
-    if (confirm("This will populate your cloud database with default tours and agents. Continue?")) {
+    if (confirm("Seed database?")) {
       setIsLoading(true);
-      try {
-        await Promise.all([
-          supabase.from('tl_tours').insert(TOURS),
-          supabase.from('tl_agents').insert(BOOKERS),
-          supabase.from('tl_customer_types').insert(CUSTOMER_TYPES)
-        ]);
-        await fetchData();
-        alert("Cloud Initialized Successfully!");
-      } catch (e) {
-        alert("Initialization failed. Check if tables exist.");
-      } finally {
-        setIsLoading(false);
-      }
+      await Promise.all([
+        supabase.from('tl_tours').insert(TOURS),
+        supabase.from('tl_agents').insert(BOOKERS),
+        supabase.from('tl_customer_types').insert(CUSTOMER_TYPES)
+      ]);
+      await fetchData();
+      setIsLoading(false);
     }
   };
 
   const handleSeatClick = (seatId: string) => {
-    if (buses.length === 0) return;
     const bus = buses[selectedBusIndex];
     if (!bus) return;
     const seat = bus.seats.find(s => s.id === seatId);
@@ -259,7 +229,7 @@ const App: React.FC = () => {
         setShowConfirmDeselect(true);
       }
     } else {
-      alert("Unauthorized Agent Code!");
+      alert("Invalid Code!");
     }
   };
 
@@ -269,111 +239,141 @@ const App: React.FC = () => {
       setIsAdminAuthenticated(true);
       setShowAdminLogin(false);
       setActiveTab('admin');
-      setAdminPasswordInput('');
     } else {
-      alert("Incorrect Admin Password!");
+      alert("Access Denied!");
     }
   };
 
   if (isLoading) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-[#001D4A] text-white">
-        <img src={BUSINESS_INFO.logo} className="w-32 animate-pulse mb-8" />
-        <div className="flex flex-col items-center gap-4">
-          <div className="flex gap-2">
-            <div className="w-3 h-3 bg-orange-500 rounded-full animate-bounce"></div>
-            <div className="w-3 h-3 bg-orange-500 rounded-full animate-bounce delay-75"></div>
-            <div className="w-3 h-3 bg-orange-500 rounded-full animate-bounce delay-150"></div>
-          </div>
-          <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Syncing with Tour লাগবে Cloud...</p>
+        <img src={BUSINESS_INFO.logo} className="w-24 animate-pulse mb-8" />
+        <div className="flex gap-2">
+          <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
+          <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+          <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
         </div>
       </div>
     );
   }
 
+  const navItems = [
+    { id: 'dashboard', icon: 'fa-chart-line', label: 'Stats' },
+    { id: 'booking', icon: 'fa-bus', label: 'Seats' },
+    { id: 'log', icon: 'fa-clipboard-list', label: 'Log' },
+    { id: 'edit', icon: 'fa-user-pen', label: 'Edit' },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans overflow-hidden relative">
-      {isSidebarOpen && <div className="fixed inset-0 bg-black/50 z-[55] md:hidden" onClick={() => setIsSidebarOpen(false)}></div>}
-      <nav className={`fixed md:sticky top-0 h-full transition-all duration-300 ease-in-out bg-[#001D4A] text-white flex flex-col shadow-2xl z-[60] shrink-0 ${isSidebarOpen ? 'w-72 translate-x-0' : 'w-72 -translate-x-full md:w-20 md:translate-x-0'}`}>
-        <div className={`p-8 text-center border-b border-white/10 ${!isSidebarOpen && 'md:p-4'}`}>
-          <img src={BUSINESS_INFO.logo} alt="Logo" className={`${isSidebarOpen ? 'w-24' : 'w-10'} transition-all mx-auto mb-2`} />
-          {isSidebarOpen && <h1 className="text-2xl font-black text-white">{BUSINESS_INFO.name}</h1>}
-        </div>
-        <div className="flex-grow py-6 space-y-1 overflow-y-auto">
-          {[
-            { id: 'dashboard', icon: 'fa-chart-line', label: 'Dashboard' },
-            { id: 'booking', icon: 'fa-ticket-alt', label: 'Seat Booking' },
-            { id: 'log', icon: 'fa-clipboard-list', label: 'Response Section' },
-            { id: 'edit', icon: 'fa-user-edit', label: 'Editor' },
-          ].map(tab => (
-            <button key={tab.id} onClick={() => { setActiveTab(tab.id as any); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-4 px-8 py-4 text-sm font-semibold transition-all group ${activeTab === tab.id ? 'bg-orange-500 text-white shadow-lg' : 'text-white/70 hover:bg-white/5 hover:text-white'} ${!isSidebarOpen && 'md:px-0 md:justify-center'}`}>
-              <i className={`fas ${tab.icon} w-6 text-center transition-transform group-hover:scale-110`}></i>
-              {isSidebarOpen && <span>{tab.label}</span>}
-            </button>
-          ))}
-          <div className={`pt-8 ${isSidebarOpen ? 'px-4' : 'px-1'}`}>
-            <div className="border-t border-white/10 pt-4">
-              <button onClick={() => setShowAdminLogin(true)} className={`w-full flex items-center gap-4 py-4 text-sm font-bold rounded-2xl transition-all ${activeTab === 'admin' ? 'bg-white text-[#001D4A]' : 'bg-indigo-600/30 text-indigo-200 hover:bg-indigo-600/50'} ${isSidebarOpen ? 'px-6' : 'justify-center'}`}>
-                <i className="fas fa-user-shield"></i>
-                {isSidebarOpen && <span>Admin Control</span>}
+    <div className="min-h-screen bg-gray-50 font-sans relative overflow-x-hidden">
+      
+      {/* Desktop Sidebar (Left) */}
+      <nav className="hidden md:flex fixed top-0 left-0 bottom-0 w-24 bg-[#001D4A] flex-col items-center justify-between py-8 shadow-2xl z-50 border-r border-white/5">
+        <div className="flex flex-col items-center w-full">
+          <img src={BUSINESS_INFO.logo} alt="Logo" className="w-14 mb-12 hover:scale-105 transition-transform" />
+          <div className="flex flex-col w-full">
+            {navItems.map(item => (
+              <button 
+                key={item.id} 
+                onClick={() => setActiveTab(item.id as any)} 
+                className={`w-full py-6 flex flex-col items-center transition-all relative ${activeTab === item.id ? 'bg-orange-500 text-white' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
+              >
+                <i className={`fas ${item.icon} text-2xl mb-1`}></i>
+                <span className="text-[10px] font-black uppercase tracking-widest">{item.label}</span>
+                {activeTab === item.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-white/20"></div>}
               </button>
-            </div>
+            ))}
           </div>
+        </div>
+        <div className="w-full flex flex-col items-center pb-4 px-2">
+          <div className="w-full h-[1px] bg-white/10 mb-8"></div>
+          <button 
+            onClick={() => setShowAdminLogin(true)} 
+            className={`w-16 h-16 flex items-center justify-center rounded-[20px] transition-all ${activeTab === 'admin' ? 'bg-orange-500 text-white' : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white'}`}
+          >
+            <i className="fas fa-user-shield text-2xl"></i>
+          </button>
         </div>
       </nav>
 
-      <main className="flex-grow h-screen overflow-auto relative flex flex-col">
-        <header className="sticky top-0 left-0 w-full bg-[#001D4A] text-white p-4 flex items-center justify-between z-50 md:hidden">
-          <button onClick={() => setIsSidebarOpen(true)} className="w-10 h-10 flex items-center justify-center bg-white/10 rounded-xl"><i className="fas fa-bars"></i></button>
-          <div className="flex items-center gap-2"><img src={BUSINESS_INFO.logo} className="h-8" /><span className="font-bold text-xs uppercase tracking-tighter">{BUSINESS_INFO.name}</span></div>
-          <div className="w-10"></div>
-        </header>
-
-        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="hidden md:flex absolute top-6 left-6 z-[70] bg-[#001D4A] text-white w-10 h-10 rounded-xl items-center justify-center shadow-lg hover:bg-orange-500 transition-colors">
-          <i className={`fas ${isSidebarOpen ? 'fa-angle-left' : 'fa-angle-right'}`}></i>
+      {/* Mobile Bottom Navigation */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#001D4A] flex items-center justify-around z-50 shadow-[0_-10px_30px_rgba(0,0,0,0.1)] border-t border-white/5">
+        {navItems.map(item => (
+          <button 
+            key={item.id} 
+            onClick={() => setActiveTab(item.id as any)} 
+            className={`flex-1 h-full flex flex-col items-center justify-center transition-all ${activeTab === item.id ? 'bg-orange-500 text-white' : 'text-white/40'}`}
+          >
+            <i className={`fas ${item.icon} text-xl mb-1`}></i>
+            <span className="text-[8px] font-black uppercase tracking-tighter">{item.label}</span>
+          </button>
+        ))}
+        <button 
+          onClick={() => setShowAdminLogin(true)} 
+          className={`flex-1 h-full flex flex-col items-center justify-center transition-all ${activeTab === 'admin' ? 'bg-orange-500 text-white' : 'text-white/40'}`}
+        >
+          <i className="fas fa-user-shield text-xl mb-1"></i>
+          <span className="text-[8px] font-black uppercase tracking-tighter">Admin</span>
         </button>
+      </nav>
 
-        <div className="p-4 md:p-10 flex-grow">
+      {/* Main Content Area */}
+      <main className={`flex-grow min-h-screen pb-20 md:pb-10 md:ml-24 overflow-x-hidden`}>
+        <div className="p-4 md:p-10 max-w-7xl mx-auto">
           {activeTab === 'booking' && (
-            <div className="max-w-6xl mx-auto md:pl-12">
-               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-10 gap-6">
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+               <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                 <div>
-                  <h2 className="text-3xl font-black text-[#001D4A]">Seat Booking</h2>
-                  <p className="text-sm text-gray-400">Cloud synchronized terminals.</p>
+                  <h2 className="text-3xl md:text-4xl font-black text-[#001D4A] tracking-tighter">Fleet Terminal</h2>
+                  <p className="text-[10px] md:text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Live Cloud Access Enabled</p>
                 </div>
                 {buses.length > 0 && (
-                  <div className="flex items-center gap-4 bg-white p-2 rounded-2xl border shadow-sm">
-                    <span className="text-[10px] font-black uppercase text-gray-400 pl-2">Selected Tour:</span>
-                    <select value={selectedBusIndex} onChange={(e) => setSelectedBusIndex(Number(e.target.value))} className="bg-transparent font-black text-[#001D4A] outline-none min-w-[150px] p-2">
+                  <div className="flex items-center gap-3 bg-white p-2 md:p-3 rounded-[24px] border shadow-xl w-full md:w-auto overflow-hidden">
+                    <span className="text-[10px] font-black uppercase text-gray-300 pl-3 shrink-0">Route:</span>
+                    <select value={selectedBusIndex} onChange={(e) => setSelectedBusIndex(Number(e.target.value))} className="bg-transparent font-black text-[#001D4A] outline-none w-full md:min-w-[180px] text-sm pr-4 appearance-none cursor-pointer">
                       {buses.map((bus, idx) => <option key={bus.busId} value={idx}>{bus.busId}</option>)}
                     </select>
+                    <i className="fas fa-chevron-down text-gray-300 pr-3 pointer-events-none"></i>
                   </div>
                 )}
               </div>
+              
               {buses.length > 0 ? (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                  <div className="lg:col-span-7 overflow-x-auto pb-4">
-                    <div className="min-w-[320px] bg-white rounded-[40px] shadow-2xl p-6 md:p-10 border border-gray-100">
-                      <BusLayout seats={buses[selectedBusIndex]?.seats || []} onSeatClick={handleSeatClick} />
-                    </div>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-12 items-start">
+                  <div className="lg:col-span-7 flex justify-center">
+                    <BusLayout seats={buses[selectedBusIndex]?.seats || []} onSeatClick={handleSeatClick} />
                   </div>
-                  <div className="lg:col-span-5 space-y-6">
-                    <div className="bg-white rounded-[32px] p-8 shadow-xl border border-gray-100">
-                      <h3 className="font-black text-[#001D4A] mb-6 flex items-center gap-3">Visual Key</h3>
-                      <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
-                        {[{c:'bg-green-500',l:'Vacant'},{c:'bg-red-500',l:'Male'},{c:'bg-pink-500',l:'Female'},{c:'bg-blue-500',l:'Special'},{c:'bg-yellow-500',l:'Gold'}].map((item,i)=>(
-                          <div key={i} className="flex items-center gap-4"><div className={`${item.c} w-10 h-10 rounded-xl`}></div><span className="text-sm font-bold text-gray-700">{item.l}</span></div>
+                  <div className="lg:col-span-5 space-y-8">
+                    <div className="bg-white rounded-[40px] p-8 md:p-10 shadow-xl border border-gray-100">
+                      <h3 className="font-black text-[#001D4A] mb-8 flex items-center gap-3 uppercase tracking-tighter text-sm border-b pb-4">
+                        <i className="fas fa-palette text-orange-500"></i> Visual Dashboard
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-5">
+                        {[
+                          {c:'bg-green-500',l:'Vacant Seat', d:'Ready for booking'},
+                          {c:'bg-red-500',l:'Male (Muslim)', d:'Red category'},
+                          {c:'bg-pink-500',l:'Female (Muslim)', d:'Pink category'},
+                          {c:'bg-blue-500',l:'Male (Others)', d:'Blue category'},
+                          {c:'bg-yellow-500',l:'Female (Others)', d:'Gold category'}
+                        ].map((item,i)=>(
+                          <div key={i} className="flex items-center gap-5 group p-3 hover:bg-gray-50 rounded-2xl transition-colors">
+                            <div className={`${item.c} w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl shadow-lg transition-transform group-hover:scale-110`}></div>
+                            <div>
+                                <p className="text-[11px] font-black text-gray-800 uppercase tracking-widest leading-none mb-1">{item.l}</p>
+                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">{item.d}</p>
+                            </div>
+                          </div>
                         ))}
                       </div>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[40px] border-2 border-dashed border-gray-100">
-                  <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center text-gray-200 text-4xl mb-6"><i className="fas fa-map-marked-alt"></i></div>
-                  <h3 className="text-xl font-black text-gray-400">No Active Tours Found</h3>
-                  <p className="text-sm text-gray-400 mb-8">Go to Admin Control to initialize your fleet.</p>
-                  <button onClick={() => setShowAdminLogin(true)} className="px-8 py-3 bg-[#001D4A] text-white rounded-xl font-black">Open Admin Panel</button>
+                <div className="flex flex-col items-center justify-center py-20 md:py-32 bg-white rounded-[40px] md:rounded-[60px] border-4 border-dashed border-gray-100 text-center px-6">
+                  <div className="w-20 h-20 md:w-24 md:h-24 bg-gray-50 rounded-full flex items-center justify-center text-gray-200 text-4xl md:text-5xl mb-8"><i className="fas fa-bus-simple"></i></div>
+                  <h3 className="text-xl md:text-2xl font-black text-gray-400 uppercase tracking-widest">Fleet Terminal Offline</h3>
+                  <p className="text-gray-300 mt-2 max-w-xs text-sm font-bold">Please initialize your tour routes and categories in the Admin Panel.</p>
+                  <button onClick={() => setShowAdminLogin(true)} className="mt-8 px-10 py-4 bg-[#001D4A] text-white rounded-[24px] font-black shadow-2xl hover:bg-orange-500 transition-all active:scale-95">Go to Admin</button>
                 </div>
               )}
             </div>
@@ -394,16 +394,17 @@ const App: React.FC = () => {
         </div>
       </main>
 
+      {/* Admin Login Modal */}
       {showAdminLogin && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#001D4A]/90 backdrop-blur-md">
-           <div className="bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl animate-in zoom-in duration-300">
-              <h3 className="text-2xl font-black text-[#001D4A] mb-2 text-center">Admin Access</h3>
-              <p className="text-sm text-gray-400 text-center mb-6">Enter secure password</p>
-              <form onSubmit={handleAdminLogin} className="space-y-4">
-                <input autoFocus type="password" placeholder="Password" value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value)} className="w-full px-5 py-4 bg-gray-50 border rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-bold text-center" />
-                <div className="flex gap-3">
-                  <button type="button" onClick={() => setShowAdminLogin(false)} className="flex-1 py-4 text-gray-500 font-bold hover:bg-gray-50 rounded-2xl">Cancel</button>
-                  <button type="submit" className="flex-1 py-4 bg-orange-500 text-white rounded-2xl font-black shadow-lg">Login</button>
+           <div className="bg-white w-full max-w-sm rounded-[40px] p-8 md:p-10 shadow-2xl animate-in zoom-in duration-300">
+              <h3 className="text-2xl md:text-3xl font-black text-[#001D4A] mb-2 text-center tracking-tighter">Admin Access</h3>
+              <p className="text-[10px] font-bold text-gray-400 text-center mb-8 uppercase tracking-[0.2em]">Secure Authentication Required</p>
+              <form onSubmit={handleAdminLogin} className="space-y-6">
+                <input autoFocus type="password" placeholder="PASSWORD" value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value)} className="w-full px-6 py-4 md:py-5 bg-gray-50 border-none rounded-[20px] focus:ring-2 focus:ring-orange-500 outline-none font-black text-center text-xl" />
+                <div className="flex gap-4">
+                  <button type="button" onClick={() => setShowAdminLogin(false)} className="flex-1 py-4 text-gray-500 font-bold hover:bg-gray-100 rounded-[20px] transition-all">Cancel</button>
+                  <button type="submit" className="flex-1 py-4 bg-orange-500 text-white rounded-[20px] font-black shadow-xl hover:bg-orange-600 transition-all active:scale-95">Unlock</button>
                 </div>
               </form>
            </div>
@@ -411,9 +412,9 @@ const App: React.FC = () => {
       )}
 
       {securityModal?.isOpen && <SecurityModal info={securityModal.targetInfo} action={securityModal.action} onClose={() => setSecurityModal(null)} onVerify={handleSecurityVerify} />}
-      {showBookingModal && <BookingModal seatId={selectedSeatId!} busNo={editingInfo ? editingInfo.busNo : (buses[selectedBusIndex]?.busId || '')} onClose={() => { setShowBookingModal(false); setSelectedSeatId(null); setEditingInfo(null); }} onSubmit={handleBookingSubmit} tours={tours} bookers={bookers} customerTypes={customerTypes} existingData={editingInfo || undefined} />}
+      {showBookingModal && <BookingModal seatId={selectedSeatId!} busNo={editingInfo ? editingInfo.busNo : (buses[selectedBusIndex]?.busId || '')} onClose={() => { setShowBookingModal(false); setEditingInfo(null); }} onSubmit={handleBookingSubmit} tours={tours} bookers={bookers} customerTypes={customerTypes} existingData={editingInfo || undefined} />}
       {showDetailModal && editingInfo && <SeatDetailModal info={editingInfo} onClose={() => { setShowDetailModal(false); setEditingInfo(null); }} onEdit={() => handleEditSeatRequest(editingInfo)} onCancel={() => triggerCancelBooking(editingInfo.busNo, editingInfo.seatNo)} onUpdate={handleBookingSubmit} />}
-      {showConfirmDeselect && <ConfirmationDialog message="Are you sure you want to cancel this booking? This action is irreversible." onConfirm={confirmDeselect} onCancel={() => setShowConfirmDeselect(false)} />}
+      {showConfirmDeselect && <ConfirmationDialog message="Are you sure you want to cancel this booking permanently?" onConfirm={confirmDeselect} onCancel={() => setShowConfirmDeselect(false)} />}
     </div>
   );
 };

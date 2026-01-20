@@ -138,18 +138,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             ${bookingsToPrint.map(info => {
               const qrData = `ID:${info.id}|Seat:${info.seatNo}|Name:${info.name}`;
               const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrData)}`;
-              const total = info.tourFees + info.customerTypeFees;
               
               return `
                 <div class="ticket-card p-4 flex flex-col justify-between bg-white rounded-lg overflow-hidden">
                   <div class="flex justify-between items-start">
                     <div class="flex flex-col">
                       <h1 class="font-black text-xl text-indigo-900 leading-none">${BUSINESS_INFO.name}</h1>
-                      <p class="text-[8px] font-bold uppercase text-gray-400 mt-1">${BUSINESS_INFO.motto}</p>
+                      <p class="text-[8px] font-bold uppercase text-gray-400 mt-1 tracking-widest">${BUSINESS_INFO.motto}</p>
                     </div>
-                    <div class="bg-indigo-900 text-white px-3 py-1 rounded flex flex-col items-center">
-                      <span class="text-[8px] font-black uppercase opacity-60">Seat No</span>
-                      <span class="text-2xl font-black leading-none">${info.seatNo}</span>
+                    <div class="bg-indigo-900 text-white px-4 py-2 rounded-xl flex flex-col items-center">
+                      <span class="text-[9px] font-black uppercase opacity-60 tracking-wider">Seat</span>
+                      <span class="text-3xl font-black leading-none">${info.seatNo}</span>
                     </div>
                   </div>
 
@@ -176,7 +175,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                     <div class="shrink-0">
                       <img src="${qrCodeUrl}" class="w-16 h-16 border p-1 rounded bg-white shadow-sm" />
-                      <p class="text-[7px] text-center font-bold text-gray-300 mt-1">#${info.id.slice(0,6)}</p>
+                      <p class="text-[7px] text-center font-bold text-gray-300 mt-1 uppercase">ID: ${info.id.slice(0,8)}</p>
                     </div>
                   </div>
 
@@ -351,7 +350,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   </td>
                   <td className="px-6 py-4 font-black text-gray-800">
                     {b.name} 
-                    <span className="text-[10px] text-indigo-600 font-black block">Seat ${b.seatNo}</span>
+                    <span className="text-[10px] text-indigo-600 font-black block uppercase tracking-widest">Seat: ${b.seatNo}</span>
                   </td>
                   <td className="px-6 py-4"><span className="text-gray-500 font-bold text-xs">{b.tourName}</span></td>
                   <td className="px-6 py-4 uppercase font-black text-[10px]"><span className={`${b.paymentStatus === 'Paid' ? 'text-green-600' : 'text-orange-500'}`}>{b.paymentStatus}</span></td>
