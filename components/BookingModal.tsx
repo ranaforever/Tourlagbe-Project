@@ -31,19 +31,20 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
   const [tourFees, setTourFees] = useState(0);
   const [customerTypeFees, setCustomerTypeFees] = useState(0);
   const [dueAmount, setDueAmount] = useState(0);
-  const [isRelaxTour, setIsRelaxTour] = useState(false);
   const [bookerName, setBookerName] = useState('');
 
   useEffect(() => {
+    // 1. Calculate Tour Base Fee
     const tour = tours.find(t => t.name === formData.tourName);
     const fee = tour ? tour.fee : 0;
     setTourFees(fee);
-    setIsRelaxTour(formData.tourName.toLowerCase().includes('relax'));
 
+    // 2. Calculate Category Surcharge
     const cType = customerTypes.find(c => c.type === formData.customerType);
     const cFee = cType ? cType.fee : 0;
     setCustomerTypeFees(cFee);
 
+    // 3. Resolve Agent Name
     if (formData.bookerCode.toUpperCase() === 'ADMIN') {
        setBookerName('System Admin');
     } else {
@@ -51,6 +52,7 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
        setBookerName(booker ? booker.name : '');
     }
 
+    // 4. Final Math
     const total = fee + cFee;
     const due = total - formData.discountAmount - formData.advanceAmount;
     setDueAmount(due);
@@ -132,6 +134,21 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
                 <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Active Route</label>
                 <select name="tourName" value={formData.tourName} onChange={handleChange} className="w-full px-5 py-4 bg-indigo-50 border-none rounded-2xl font-black text-indigo-700 text-xs uppercase tracking-tight">{tours.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}</select>
               </div>
+              
+              {/* Conditional Rendering of Pricing Category */}
+              {customerTypes.length > 0 && (
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Pricing Category</label>
+                  <select name="customerType" value={formData.customerType} onChange={handleChange} className="w-full px-5 py-4 bg-blue-50 border-none rounded-2xl font-black text-blue-700 text-xs uppercase tracking-tight">
+                    {customerTypes.map(c => (
+                      <option key={c.type} value={c.type}>
+                        {c.type} {c.fee > 0 ? `(+৳${c.fee.toLocaleString()})` : '(No extra fee)'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1"><label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Discount</label><input type="number" inputMode="numeric" name="discountAmount" value={formData.discountAmount || ''} onChange={handleNumericChange} className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl font-black text-sm" /></div>
                 <div className="space-y-1"><label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Advance</label><input type="number" inputMode="numeric" name="advanceAmount" value={formData.advanceAmount || ''} onChange={handleNumericChange} className="w-full px-5 py-4 bg-green-50 border-none rounded-2xl font-black text-green-700 text-sm" /></div>

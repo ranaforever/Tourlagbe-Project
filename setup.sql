@@ -1,8 +1,9 @@
 
--- Full SQL Setup for Tour লাগবে (Tour Lagbe)
--- This script is idempotent: it can be run multiple times without causing errors.
+-- Optimized SQL Setup for Tour লাগবে (Tour Lagbe)
+-- This script ensures that Admin Panel edits (like renaming a tour) 
+-- automatically update all existing bookings.
 
--- 1. Create Necessary Tables
+-- 1. Master Data Tables
 CREATE TABLE IF NOT EXISTS tl_tours (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT UNIQUE NOT NULL,
@@ -25,6 +26,7 @@ CREATE TABLE IF NOT EXISTS tl_customer_types (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 2. Transactional Table with Cascading Relations
 CREATE TABLE IF NOT EXISTS tl_bookings (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -32,7 +34,8 @@ CREATE TABLE IF NOT EXISTS tl_bookings (
   address TEXT,
   gender TEXT,
   religion TEXT,
-  tour_name TEXT,
+  -- Link to tour name. ON UPDATE CASCADE ensures renames in Admin Panel flow through.
+  tour_name TEXT REFERENCES tl_tours(name) ON UPDATE CASCADE ON DELETE SET NULL,
   tour_fees NUMERIC DEFAULT 0,
   customer_type TEXT,
   customer_type_fees NUMERIC DEFAULT 0,
@@ -44,7 +47,8 @@ CREATE TABLE IF NOT EXISTS tl_bookings (
   seat_no TEXT NOT NULL,
   booked_by TEXT,
   booker_code TEXT,
-  booking_date TIMESTAMPTZ DEFAULT NOW()
+  booking_date TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS tl_expenses (
@@ -55,7 +59,9 @@ CREATE TABLE IF NOT EXISTS tl_expenses (
   date DATE NOT NULL DEFAULT CURRENT_DATE,
   recorded_by TEXT,
   agent_code TEXT,
-  tour_name TEXT
+  -- Link to tour name for reporting
+  tour_name TEXT REFERENCES tl_tours(name) ON UPDATE CASCADE ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS tl_locks (
@@ -68,16 +74,12 @@ CREATE TABLE IF NOT EXISTS tl_locks (
   UNIQUE(bus_no, seat_no)
 );
 
--- 2. Seed Initial Data (if empty)
-INSERT INTO tl_customer_types (type, fee) 
-VALUES ('Standard', 0), ('Solo', 1500) 
-ON CONFLICT (type) DO NOTHING;
+-- 3. Performance Indexes
+CREATE INDEX IF NOT EXISTS idx_bookings_mobile ON tl_bookings(mobile);
+CREATE INDEX IF NOT EXISTS idx_bookings_tour ON tl_bookings(tour_name);
+CREATE INDEX IF NOT EXISTS idx_expenses_date ON tl_expenses(date);
 
-INSERT INTO tl_tours (name, fee)
-VALUES ('Sajek Valley', 4500), ('Cox''s Bazar Relax', 6500)
-ON CONFLICT (name) DO NOTHING;
-
--- 3. Configure Realtime (Handles existing publication errors)
+-- 4. Realtime Configuration (Idempotent)
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
@@ -85,7 +87,6 @@ BEGIN
   END IF;
 END $$;
 
--- Add tables to publication safely
 DO $$
 DECLARE
     tbl_name TEXT;
