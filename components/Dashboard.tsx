@@ -101,12 +101,14 @@ const Dashboard: React.FC<DashboardProps> = ({ buses, expenses }) => {
                        </span>
                        <div>
                          <p className="text-sm font-bold truncate max-w-[120px]">{agent.name}</p>
-                         <p className="text-[10px] text-white/40 font-bold uppercase">{agent.seats} Seats Booked</p>
+                         <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[8px] font-black bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded uppercase tracking-tighter">ID: {agent.code}</span>
+                            <p className="text-[9px] text-white/40 font-bold uppercase">{agent.seats} Seats</p>
+                         </div>
                        </div>
                     </div>
                     <div className="text-right">
                        <p className="text-xs font-black text-orange-400">৳{agent.revenue.toLocaleString()}</p>
-                       <p className="text-[9px] text-white/40 uppercase font-bold">{agent.code}</p>
                     </div>
                   </div>
                 )) : (

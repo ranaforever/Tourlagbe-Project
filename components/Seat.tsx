@@ -33,7 +33,6 @@ const Seat: React.FC<SeatProps> = ({ data, onClick }) => {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onTouchStart={() => setIsHovered(true)}
-      // Tooltip stays a bit longer on mobile after touch to allow reading
       onTouchEnd={() => setTimeout(() => setIsHovered(false), 3000)}
     >
       <button
@@ -59,7 +58,6 @@ const Seat: React.FC<SeatProps> = ({ data, onClick }) => {
           </div>
           
           <div className="p-4 md:p-5 space-y-3">
-            {/* Passenger Header */}
             <div className="flex justify-between items-start border-b border-gray-100 pb-2">
                <div>
                   <p className="text-sm font-black text-[#001D4A] leading-tight">{info.name}</p>
@@ -72,15 +70,10 @@ const Seat: React.FC<SeatProps> = ({ data, onClick }) => {
                </div>
             </div>
             
-            {/* Financial Details */}
             <div className="space-y-1 text-[10px]">
               <div className="flex justify-between">
                 <span className="text-gray-400 font-bold uppercase">Total Fees</span>
                 <span className="font-black text-gray-700">৳{totalFees.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400 font-bold uppercase">Discount</span>
-                <span className="font-black text-blue-600">- ৳{info.discountAmount.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400 font-bold uppercase">Advanced</span>
@@ -88,21 +81,18 @@ const Seat: React.FC<SeatProps> = ({ data, onClick }) => {
               </div>
             </div>
 
-            {/* Due Balance Highlight */}
-            <div className="bg-red-50 p-3 rounded-xl flex justify-between items-center border border-red-100">
-               <span className="text-[9px] font-black text-red-400 uppercase">Outstanding Due</span>
-               <span className="text-lg font-black text-red-600">৳{info.dueAmount.toLocaleString()}</span>
+            <div className="bg-red-50 p-2 rounded-xl flex justify-between items-center border border-red-100">
+               <span className="text-[9px] font-black text-red-400 uppercase">Due</span>
+               <span className="text-base font-black text-red-600">৳{info.dueAmount.toLocaleString()}</span>
             </div>
 
-            {/* Footer / Agent */}
-            <div className="flex justify-between items-center pt-1">
-              <span className="text-[8px] text-gray-400 font-bold uppercase italic">Booked By {info.bookedBy}</span>
-              <span className="text-[8px] font-black text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded uppercase tracking-tighter">Code: {info.bookerCode}</span>
+            <div className="flex justify-between items-center pt-2 border-t border-gray-50">
+              <div className="flex flex-col">
+                <span className="text-[7px] text-gray-400 font-bold uppercase">Booking Agent</span>
+                <span className="text-[9px] text-indigo-600 font-black uppercase">{info.bookedBy}</span>
+              </div>
+              <span className="text-[9px] font-black text-white bg-indigo-500 px-2 py-0.5 rounded uppercase tracking-tighter">Agent ID: {info.bookerCode}</span>
             </div>
-          </div>
-          
-          <div className="bg-gray-50 px-4 py-1.5 text-center text-[7px] font-black text-gray-300 uppercase tracking-[0.2em]">
-            Digital Booking Terminal 2.0
           </div>
         </div>
       )}

@@ -29,7 +29,7 @@ const BookingLog: React.FC<BookingLogProps> = ({ buses }) => {
   const uniqueTours = useMemo(() => Array.from(new Set(allBookings.map(b => b.tourName))), [allBookings]);
 
   const downloadCSV = () => {
-    const headers = ['Seat', 'Name', 'Mobile', 'Tour', 'Total Fees', 'Advance', 'Due', 'Status', 'Booked By', 'Date'];
+    const headers = ['Seat', 'Name', 'Mobile', 'Tour', 'Total Fees', 'Advance', 'Due', 'Status', 'Booked By', 'Booker ID', 'Date'];
     const rows = filteredBookings.map(b => [
       `${b.busNo}-${b.seatNo}`,
       b.name,
@@ -40,6 +40,7 @@ const BookingLog: React.FC<BookingLogProps> = ({ buses }) => {
       b.dueAmount,
       b.paymentStatus,
       b.bookedBy,
+      b.bookerCode,
       new Date(b.bookingDate).toLocaleDateString()
     ]);
 
@@ -88,7 +89,7 @@ const BookingLog: React.FC<BookingLogProps> = ({ buses }) => {
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Booker/Agent</label>
             <input 
               type="text"
-              placeholder="Search Name or Code"
+              placeholder="Search Name or ID Code"
               value={filterBooker}
               onChange={(e) => setFilterBooker(e.target.value)}
               className="w-full bg-white border-none rounded-xl px-4 py-3 text-sm font-bold shadow-sm focus:ring-2 focus:ring-indigo-500"
@@ -115,7 +116,7 @@ const BookingLog: React.FC<BookingLogProps> = ({ buses }) => {
               <th className="px-6 py-4">Tour Info</th>
               <th className="px-6 py-4">Financials</th>
               <th className="px-6 py-4">Status</th>
-              <th className="px-6 py-4">Agent</th>
+              <th className="px-6 py-4">Agent Details</th>
               <th className="px-6 py-4">Date</th>
             </tr>
           </thead>
@@ -147,7 +148,7 @@ const BookingLog: React.FC<BookingLogProps> = ({ buses }) => {
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-gray-800 font-black">{b.bookedBy}</p>
-                    <p className="text-[10px] text-indigo-400 font-bold">{b.bookerCode}</p>
+                    <span className="text-[9px] font-black text-white bg-indigo-400 px-2 py-0.5 rounded uppercase tracking-tighter">ID: {b.bookerCode}</span>
                   </td>
                   <td className="px-6 py-4 text-gray-400 font-bold">{new Date(b.bookingDate).toLocaleDateString()}</td>
                 </tr>
