@@ -66,7 +66,7 @@ const BookingLog: React.FC<BookingLogProps> = ({ buses }) => {
           </div>
           <button 
             onClick={downloadCSV}
-            className="w-full md:w-auto bg-[#001D4A] text-white px-6 py-4 rounded-2xl text-xs font-black uppercase shadow-lg hover:bg-orange-500 transition-all flex items-center justify-center gap-2 active:scale-95"
+            className="w-full md:w-auto bg-[#001D4A] text-white px-6 py-4 rounded-2xl text-xs font-black uppercase shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95"
           >
             <i className="fas fa-file-csv text-base"></i> Export Data
           </button>
@@ -115,7 +115,7 @@ const BookingLog: React.FC<BookingLogProps> = ({ buses }) => {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredBookings.map((b) => (
-                <tr key={b.id} className="hover:bg-indigo-50/30 transition-colors">
+                <tr key={b.id} className="transition-colors">
                   <td className="px-6 py-4 font-black text-indigo-600">{b.seatNo}</td>
                   <td className="px-6 py-4">
                     <p className="font-bold text-gray-800">{b.name}</p>

@@ -43,13 +43,13 @@ const SecurityModal: React.FC<SecurityModalProps> = ({ info, action, onClose, on
             <button 
               type="button" 
               onClick={onClose} 
-              className="flex-1 py-4 text-gray-500 font-bold hover:bg-gray-50 rounded-2xl transition-colors"
+              className="flex-1 py-4 text-gray-500 font-bold rounded-2xl transition-colors"
             >
               Cancel
             </button>
             <button 
               type="submit" 
-              className="flex-1 py-4 bg-[#001D4A] text-white rounded-2xl font-black shadow-lg hover:bg-indigo-700 transition-all active:scale-95"
+              className="flex-1 py-4 bg-[#001D4A] text-white rounded-2xl font-black shadow-lg transition-all active:scale-95"
             >
               Verify
             </button>

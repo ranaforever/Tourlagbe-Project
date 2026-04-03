@@ -299,7 +299,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           <button 
             key={tab.id} 
             onClick={() => setActiveSubTab(tab.id as any)} 
-            className={`flex flex-col md:flex-row items-center justify-center gap-1.5 md:gap-2 px-2 py-3.5 md:px-6 md:py-4 rounded-[20px] transition-all uppercase ${activeSubTab === tab.id ? 'bg-[#001D4A] text-white shadow-lg' : 'text-gray-400 hover:bg-gray-50'}`}
+            className={`flex flex-col md:flex-row items-center justify-center gap-1.5 md:gap-2 px-2 py-3.5 md:px-6 md:py-4 rounded-[20px] transition-all uppercase ${activeSubTab === tab.id ? 'bg-[#001D4A] text-white shadow-lg' : 'text-gray-400'}`}
           >
             <i className={`fas ${tab.icon} text-sm md:text-xs`}></i>
             <span className="font-black text-[8px] md:text-[10px] tracking-tight md:tracking-widest">{tab.label}</span>

@@ -10,7 +10,7 @@ interface SeatProps {
 const Seat: React.FC<SeatProps> = ({ data, onClick }) => {
   const getSeatColor = () => {
     // Priority 1: Temporary Lock (Gray Pulse)
-    if (data.lockInfo) return 'bg-gray-400 hover:bg-gray-500 shadow-gray-200 animate-pulse cursor-not-allowed';
+    if (data.lockInfo) return 'bg-gray-400 shadow-gray-200 animate-pulse cursor-not-allowed';
     
     // Priority 2: Confirmed Booking
     if (data.isBooked && data.bookingInfo) {
@@ -18,14 +18,14 @@ const Seat: React.FC<SeatProps> = ({ data, onClick }) => {
       const isFemale = info.gender === Gender.FEMALE;
       const isMuslim = info.religion === Religion.MUSLIM;
 
-      if (isFemale && !isMuslim) return 'bg-yellow-500 hover:bg-yellow-600 shadow-yellow-200';
-      if (isFemale) return 'bg-pink-500 hover:bg-pink-600 shadow-pink-200';
-      if (!isMuslim) return 'bg-blue-500 hover:bg-blue-600 shadow-blue-200';
-      return 'bg-red-500 hover:bg-red-600 shadow-red-200';
+      if (isFemale && !isMuslim) return 'bg-yellow-500 shadow-yellow-200';
+      if (isFemale) return 'bg-pink-500 shadow-pink-200';
+      if (!isMuslim) return 'bg-blue-500 shadow-blue-200';
+      return 'bg-red-500 shadow-red-200';
     }
     
     // Priority 3: Available
-    return 'bg-green-500 hover:bg-green-600 shadow-green-200';
+    return 'bg-green-500 shadow-green-200';
   };
 
   return (

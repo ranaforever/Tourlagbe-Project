@@ -130,7 +130,7 @@ const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit
                   <span className="text-[10px] font-black text-white bg-indigo-600 px-4 py-1 rounded-full uppercase mb-3 inline-block tracking-widest shadow-lg">Cloud Registry</span>
                   <h3 className="text-3xl md:text-5xl font-black text-[#001D4A] tracking-tighter leading-none truncate max-w-[300px]">{info.name}</h3>
                 </div>
-                <button onClick={onClose} className="w-10 h-10 md:w-12 md:h-12 bg-gray-50 rounded-full flex items-center justify-center hover:bg-gray-100 transition-all text-gray-400 active:scale-90">
+                <button onClick={onClose} className="w-10 h-10 md:w-12 md:h-12 bg-gray-50 rounded-full flex items-center justify-center transition-all text-gray-400 active:scale-90">
                   <i className="fas fa-times text-xl"></i>
                 </button>
              </div>
@@ -202,21 +202,21 @@ const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit
                 <div className="grid grid-cols-2 gap-4">
                   <button 
                     onClick={printTicket}
-                    className="py-4 md:py-5 bg-[#312e81] text-white rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base hover:bg-indigo-900 shadow-xl shadow-indigo-100 flex items-center justify-center gap-2 transition-all active:scale-95"
+                    className="py-4 md:py-5 bg-[#312e81] text-white rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base shadow-xl shadow-indigo-100 flex items-center justify-center gap-2 transition-all active:scale-95"
                   >
                     <i className="fas fa-print"></i> Print
                   </button>
 
                   <button 
                     onClick={handleShareTicket}
-                    className="py-4 md:py-5 bg-[#10a342] text-white rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base hover:bg-green-700 shadow-xl shadow-green-100 flex items-center justify-center gap-2 transition-all active:scale-95"
+                    className="py-4 md:py-5 bg-[#10a342] text-white rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base shadow-xl shadow-green-100 flex items-center justify-center gap-2 transition-all active:scale-95"
                   >
                     <i className="fas fa-share-nodes"></i> Share
                   </button>
                   
                   <button 
                     onClick={onEdit}
-                    className="py-4 md:py-5 bg-[#eef5ff] text-[#3b82f6] rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base hover:bg-blue-100 flex items-center justify-center gap-2 transition-all active:scale-95"
+                    className="py-4 md:py-5 bg-[#eef5ff] text-[#3b82f6] rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base flex items-center justify-center gap-2 transition-all active:scale-95"
                   >
                     <i className="fas fa-user-edit"></i> Edit
                   </button>
@@ -224,7 +224,7 @@ const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit
                   <button 
                     onClick={() => setShowPaymentModal(true)}
                     disabled={info.dueAmount <= 0}
-                    className={`py-4 md:py-5 rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl ${info.dueAmount > 0 ? 'bg-[#ff7a1a] text-white hover:bg-orange-600 shadow-orange-100' : 'bg-gray-100 text-gray-300 cursor-not-allowed shadow-none'}`}
+                    className={`py-4 md:py-5 rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl ${info.dueAmount > 0 ? 'bg-[#ff7a1a] text-white shadow-orange-100' : 'bg-gray-100 text-gray-300 cursor-not-allowed shadow-none'}`}
                   >
                     <i className="fas fa-money-bill-wave"></i> Due Pay ৳{info.dueAmount}
                   </button>
@@ -233,7 +233,7 @@ const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit
                 {isAdmin && (
                   <button 
                     onClick={onCancel}
-                    className="w-full py-4 bg-[#fff1f1] text-red-500 rounded-[32px] md:rounded-[40px] font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95 flex items-center justify-center gap-2"
+                    className="w-full py-4 bg-[#fff1f1] text-red-500 rounded-[32px] md:rounded-[40px] font-black text-xs uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2"
                   >
                     <i className="fas fa-trash-alt"></i> Cancel Booking Permanently
                   </button>

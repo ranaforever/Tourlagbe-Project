@@ -135,7 +135,7 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
                 </div>
               </div>
               {editId && (
-                <button onClick={resetForm} className="px-3 py-1.5 bg-gray-100 text-[9px] font-black text-gray-500 rounded-lg uppercase tracking-widest hover:bg-red-50 hover:text-red-500 transition-all">
+                <button onClick={resetForm} className="px-3 py-1.5 bg-gray-100 text-[9px] font-black text-gray-500 rounded-lg uppercase tracking-widest transition-all">
                   Cancel
                 </button>
               )}
@@ -203,7 +203,7 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
            
            <div className="space-y-3">
               {filteredExpenses.map(ex => (
-                <div key={ex.id} className={`bg-white p-5 rounded-[32px] shadow-sm border transition-all group ${editId === ex.id ? 'border-blue-500 ring-2 ring-blue-50' : 'border-gray-50 hover:border-indigo-100 hover:shadow-md'} flex items-center justify-between`}>
+                <div key={ex.id} className={`bg-white p-5 rounded-[32px] shadow-sm border transition-all group ${editId === ex.id ? 'border-blue-500 ring-2 ring-blue-50' : 'border-gray-50'} flex items-center justify-between`}>
                    <div className="flex items-center gap-4">
                       <div className={`w-12 h-12 ${editId === ex.id ? 'bg-blue-600 text-white' : 'bg-red-50 text-red-500'} rounded-2xl flex items-center justify-center text-sm transition-all`}>
                         <i className="fas fa-receipt"></i>
@@ -229,14 +229,14 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
                         <div className="flex items-center gap-1.5 ml-2">
                           <button 
                             onClick={() => handleEdit(ex)} 
-                            className="w-9 h-9 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center active:scale-90 transition-all opacity-0 group-hover:opacity-100 hidden md:flex"
+                            className="w-9 h-9 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center active:scale-90 transition-all hidden md:flex"
                             title="Edit Record"
                           >
                             <i className="fas fa-edit text-[11px]"></i>
                           </button>
                           <button 
                             onClick={() => handleDelete(ex.id)} 
-                            className="w-9 h-9 bg-red-50 text-red-500 rounded-xl flex items-center justify-center active:scale-90 transition-all opacity-0 group-hover:opacity-100 hidden md:flex"
+                            className="w-9 h-9 bg-red-50 text-red-500 rounded-xl flex items-center justify-center active:scale-90 transition-all hidden md:flex"
                             title="Delete Record"
                           >
                             <i className="fas fa-trash-alt text-[11px]"></i>

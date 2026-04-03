@@ -414,7 +414,7 @@ const App: React.FC = () => {
         <div className="flex flex-col items-center w-full">
           <img src={BUSINESS_INFO.logo} alt="Logo" className="w-14 mb-12" />
           {navItems.map(item => (
-            <button key={item.id} onClick={() => setActiveTab(item.id as any)} className={`w-full py-5 flex flex-col items-center transition-all ${activeTab === item.id ? 'bg-orange-500 text-white shadow-lg' : 'text-white/40 hover:text-white'}`}>
+            <button key={item.id} onClick={() => setActiveTab(item.id as any)} className={`w-full py-5 flex flex-col items-center transition-all ${activeTab === item.id ? 'bg-orange-500 text-white shadow-lg' : 'text-white/40'}`}>
               <i className={`fas ${item.icon} text-xl mb-1`}></i>
               <span className="text-[9px] font-black uppercase">{item.label}</span>
             </button>
