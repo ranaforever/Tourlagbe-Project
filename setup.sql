@@ -87,6 +87,14 @@ BEGIN
   END IF;
 END $$;
 
+-- Function to clear expired locks (can be called from frontend or via cron)
+CREATE OR REPLACE FUNCTION clear_expired_locks() 
+RETURNS void AS $$
+BEGIN
+  DELETE FROM tl_locks WHERE expires_at < NOW();
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 DO $$
 DECLARE
     tbl_name TEXT;
@@ -95,6 +103,7 @@ BEGIN
     FOREACH tbl_name IN ARRAY tbl_list
     LOOP
         IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = tbl_name AND schemaname = 'public') THEN
+            -- Enable Realtime
             IF NOT EXISTS (
                 SELECT 1 FROM pg_publication_tables 
                 WHERE pubname = 'supabase_realtime' 
@@ -102,6 +111,14 @@ BEGIN
             ) THEN
                 EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', tbl_name);
             END IF;
+            
+            -- Enable RLS
+            EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', tbl_name);
+            
+            -- Create permissive policies for anon role (to match current app usage)
+            -- Note: For production, consider using auth.uid() and more restrictive roles.
+            EXECUTE format('DROP POLICY IF EXISTS "Allow all access to %I" ON %I', tbl_name, tbl_name);
+            EXECUTE format('CREATE POLICY "Allow all access to %I" ON %I FOR ALL USING (true) WITH CHECK (true)', tbl_name, tbl_name);
         END IF;
     END LOOP;
 END $$;

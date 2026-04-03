@@ -6,9 +6,11 @@ interface RevenueReportProps {
   buses: BusData[];
   expenses: Expense[];
   tours: Tour[];
+  isAdmin?: boolean;
+  onClearExpenses?: () => void;
 }
 
-const RevenueReport: React.FC<RevenueReportProps> = ({ buses, expenses, tours }) => {
+const RevenueReport: React.FC<RevenueReportProps> = ({ buses, expenses, tours, isAdmin, onClearExpenses }) => {
   const [filterTour, setFilterTour] = useState('');
 
   const filteredBookings: BookingInfo[] = useMemo(() => {
@@ -171,14 +173,24 @@ const RevenueReport: React.FC<RevenueReportProps> = ({ buses, expenses, tours })
             </div>
          </div>
 
-         {/* Expense Breakdown */}
-         <div className="lg:col-span-2 bg-white p-8 md:p-10 rounded-[40px] shadow-xl border border-gray-100">
-            <div className="flex justify-between items-center mb-8">
-               <h3 className="text-xl font-black text-[#001D4A] uppercase tracking-tighter flex items-center gap-3">
-                  <i className="fas fa-chart-area text-red-500"></i> Cost Distribution {filterTour && `for ${filterTour}`}
-               </h3>
-               <span className="text-xs font-black text-red-500 bg-red-50 px-4 py-1 rounded-full uppercase">Total Category Costs: ৳{totalExpenses.toLocaleString()}</span>
-            </div>
+          {/* Expense Breakdown */}
+          <div className="lg:col-span-2 bg-white p-8 md:p-10 rounded-[40px] shadow-xl border border-gray-100">
+             <div className="flex justify-between items-center mb-8">
+                <div className="flex items-center gap-4">
+                  <h3 className="text-xl font-black text-[#001D4A] uppercase tracking-tighter flex items-center gap-3">
+                     <i className="fas fa-chart-area text-red-500"></i> Cost Distribution {filterTour && `for ${filterTour}`}
+                  </h3>
+                  {isAdmin && onClearExpenses && (
+                    <button 
+                      onClick={onClearExpenses}
+                      className="text-[9px] font-black text-red-500 bg-red-50 px-3 py-1 rounded-lg uppercase hover:bg-red-500 hover:text-white transition-all"
+                    >
+                      Clear All Data
+                    </button>
+                  )}
+                </div>
+                <span className="text-xs font-black text-red-500 bg-red-50 px-4 py-1 rounded-full uppercase">Total Category Costs: ৳{totalExpenses.toLocaleString()}</span>
+             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
                {expenseByCategory.map(([cat, val]) => (
                   <div key={cat} className="group">

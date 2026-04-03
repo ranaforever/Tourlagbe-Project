@@ -165,7 +165,6 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
                     name="bookerCode" 
                     value={formData.bookerCode} 
                     onChange={handleChange} 
-                    readOnly={isAdmin}
                     className={`w-full px-5 py-4 border-2 rounded-2xl font-black text-sm tracking-widest uppercase outline-none transition-all ${isAdmin ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : (bookerName ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-100 bg-gray-50 text-gray-800')}`} 
                     placeholder={isAdmin ? "ADMIN BYPASS" : "YOUR CODE"} 
                   />

@@ -46,6 +46,9 @@ const App: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     try {
+      // Clean up expired locks globally to keep the table small
+      await supabase.from('tl_locks').delete().lt('expires_at', new Date().toISOString());
+
       const [toursRes, bookersRes, typesRes, bookingsRes, expensesRes, locksRes] = await Promise.all([
         supabase.from('tl_tours').select('*').order('name'),
         supabase.from('tl_agents').select('*').order('name'),
@@ -154,6 +157,17 @@ const App: React.FC = () => {
 
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
     try {
+      // CRITICAL FIX: Clear expired locks for this specific seat first to prevent UNIQUE constraint errors
+      // We use the RPC function we added to setup.sql for a clean global clear
+      await supabase.rpc('clear_expired_locks');
+      
+      // Also try direct delete for this specific seat just in case
+      await supabase.from('tl_locks')
+        .delete()
+        .eq('bus_no', currentBus.busId)
+        .eq('seat_no', sid)
+        .lt('expires_at', new Date().toISOString());
+
       const { error } = await supabase.from('tl_locks').insert({
         bus_no: currentBus.busId,
         seat_no: sid,
@@ -297,6 +311,18 @@ const App: React.FC = () => {
       fetchData();
     } catch (e) {
       alert("Delete failed.");
+    }
+  };
+
+  const handleClearExpenses = async () => {
+    if (!isAdminAuthenticated) return;
+    if (!confirm("Are you sure you want to clear ALL expense data? This cannot be undone.")) return;
+    try {
+      const { error } = await supabase.from('tl_expenses').delete().neq('id', '0');
+      if (error) throw error;
+      fetchData();
+    } catch (e) {
+      alert("Failed to clear expenses.");
     }
   };
 
@@ -459,7 +485,7 @@ const App: React.FC = () => {
           {activeTab === 'dashboard' && <Dashboard buses={buses} expenses={expenses} />}
           {activeTab === 'log' && <BookingLog buses={buses} bookers={bookers} />}
           {activeTab === 'expenses' && <ExpenseTracker expenses={expenses} onSubmit={handleExpenseSubmit} onDelete={handleExpenseDelete} bookers={bookers} initialAgentCode={authenticatedAgent?.code} tours={tours} isAdmin={isAdminAuthenticated} />}
-          {activeTab === 'revenue' && <RevenueReport buses={buses} expenses={expenses} tours={tours} />}
+          {activeTab === 'revenue' && <RevenueReport buses={buses} expenses={expenses} tours={tours} isAdmin={isAdminAuthenticated} onClearExpenses={handleClearExpenses} />}
           {activeTab === 'edit' && <EditData buses={buses} onUpdate={handleBookingSubmit} onDelete={handleBookingDelete} onBulkDelete={handleBulkDelete} onEdit={(info) => { setEditingInfo(info); setSelectedSeatId(info.seatNo); setShowBookingModal(true); }} bookers={bookers} isAdmin={isAdminAuthenticated} />}
           {activeTab === 'admin' && isAdminAuthenticated && (
             <AdminPanel 
