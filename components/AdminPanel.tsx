@@ -41,13 +41,25 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   
   const [foodType, setFoodType] = useState<'Breakfast' | 'Lunch' | 'Dinner' | 'Special Item' | 'Snacks' | 'Refreshment'>('Breakfast');
   const [foodTime, setFoodTime] = useState('08:30 AM');
+  const [foodMenu, setFoodMenu] = useState('Standard Set Menu');
   const [foodFilterTour, setFoodFilterTour] = useState('');
   const [foodFilterBooker, setFoodFilterBooker] = useState('');
+
+  const [printFilterTour, setPrintFilterTour] = useState('');
+  const [printFilterBooker, setPrintFilterBooker] = useState('');
 
   const allBookings: BookingInfo[] = useMemo(() => 
     buses.flatMap(b => b.seats.filter(s => s.isBooked).map(s => s.bookingInfo!)),
     [buses]
   );
+
+  const filteredPrintBookings = useMemo(() => {
+    return allBookings.filter(b => {
+      const matchTour = printFilterTour === '' || b.tourName === printFilterTour;
+      const matchBooker = printFilterBooker === '' || b.bookerCode === printFilterBooker;
+      return matchTour && matchBooker;
+    });
+  }, [allBookings, printFilterTour, printFilterBooker]);
 
   const filteredFoodBookings = useMemo(() => {
     return allBookings.filter(b => {
@@ -118,19 +130,26 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;700&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
           <style>
             @page { size: A4; margin: 0; }
-            body { font-family: 'Inter', 'Hind Siliguri', sans-serif; background: white; margin: 0; padding: 20px; }
-            .ticket-grid { display: flex; flex-wrap: wrap; width: 210mm; height: 297mm; align-content: flex-start; }
+            body { font-family: 'Inter', 'Hind Siliguri', sans-serif; background: white; margin: 0; padding: 0; }
+            .ticket-grid { 
+              display: grid; 
+              grid-template-columns: repeat(2, 105mm); 
+              grid-template-rows: repeat(4, 74.25mm);
+              width: 210mm; 
+              height: 297mm; 
+            }
             .ticket-item { 
-              width: 50%; 
-              height: 25%; 
-              border: 0.5pt dashed #ccc; 
-              padding: 20px; 
+              width: 105mm; 
+              height: 74.25mm; 
+              border: 0.2pt dashed #ddd; 
+              padding: 15mm 10mm; 
               box-sizing: border-box; 
               display: flex; 
               flex-direction: column; 
               justify-content: space-between;
               break-inside: avoid;
               overflow: hidden;
+              position: relative;
             }
             @media print { body { -webkit-print-color-adjust: exact; } }
           </style>
@@ -215,15 +234,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             body { font-family: 'Inter', sans-serif; background: white; margin: 0; padding: 0; }
             .token-grid { 
               display: grid; 
-              grid-template-columns: repeat(4, 1fr); 
-              grid-template-rows: repeat(6, 1fr);
+              grid-template-columns: repeat(4, 52.5mm); 
+              grid-template-rows: repeat(6, 49.5mm);
               width: 210mm; 
               height: 297mm; 
               box-sizing: border-box;
             }
             .token-item { 
-              border: 0.1pt dashed #aaa; 
-              padding: 12px; 
+              width: 52.5mm;
+              height: 49.5mm;
+              border: 0.1pt dashed #bbb; 
+              padding: 5mm; 
               display: flex; 
               flex-direction: column; 
               align-items: center; 
@@ -236,9 +257,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             }
             .token-watermark {
               position: absolute;
-              font-size: 40px;
+              font-size: 32px;
               font-weight: 900;
-              color: rgba(0,0,0,0.035);
+              color: rgba(0,0,0,0.03);
               transform: rotate(-15deg);
               z-index: 0;
               pointer-events: none;
@@ -257,20 +278,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div class="token-watermark">${foodType.toUpperCase()}</div>
                 
                 <div class="relative z-10 flex flex-col items-center">
-                   <img src="${BUSINESS_INFO.logo}" class="h-10 mb-2" />
-                   <h2 class="text-[11px] font-black text-indigo-900 uppercase tracking-[0.2em] leading-none mb-1">${foodType}</h2>
+                   <img src="${BUSINESS_INFO.logo}" class="h-8 mb-1" />
+                   <h2 class="text-[10px] font-black text-indigo-900 uppercase tracking-[0.1em] leading-none mb-0.5">${foodType}</h2>
                 </div>
                 
                 <div class="relative z-10 w-full">
-                   <p class="text-[12px] font-black text-gray-800 leading-tight mb-2">${info.name}</p>
-                   <div class="bg-[#001D4A] text-white rounded-[10px] px-3 py-1.5 inline-block shadow-sm">
-                      <p class="text-[10px] font-black uppercase tracking-widest">Seat: ${info.seatNo}</p>
+                   <p class="text-[11px] font-black text-gray-800 leading-tight mb-1 truncate">${info.name}</p>
+                   <div class="bg-[#001D4A] text-white rounded-lg px-2 py-1 inline-block">
+                      <p class="text-[9px] font-black uppercase tracking-widest">Seat: ${info.seatNo}</p>
                    </div>
                 </div>
 
                 <div class="relative z-10 flex flex-col items-center">
-                   <span class="text-[8px] font-black text-orange-500 uppercase tracking-[0.1em] mb-1">Serving Time</span>
-                   <span class="text-[14px] font-black text-gray-900 leading-none">${foodTime}</span>
+                   <p class="text-[7px] font-bold text-gray-400 uppercase leading-none mb-1">${foodMenu}</p>
+                   <div class="flex flex-col items-center">
+                      <span class="text-[7px] font-black text-orange-500 uppercase tracking-[0.1em] mb-0.5">Serving Time</span>
+                      <span class="text-[12px] font-black text-gray-900 leading-none">${foodTime}</span>
+                   </div>
                 </div>
               </div>
             `).join('')}
@@ -469,16 +493,29 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   <h3 className="text-xl font-black uppercase tracking-tighter">Batch Printing</h3>
                   <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mt-1">Select bookings to print tickets</p>
                </div>
-               <button onClick={() => setSelectedForPrint(allBookings.map(b => b.id))} className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Select All</button>
+               <div className="flex gap-4">
+                  <button onClick={() => setSelectedForPrint(filteredPrintBookings.map(b => b.id))} className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Select All</button>
+                  <button onClick={() => setSelectedForPrint([])} className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Deselect All</button>
+               </div>
             </div>
             <button onClick={handlePrintBatch} disabled={selectedForPrint.length === 0} className="w-full py-5 bg-orange-500 text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl disabled:opacity-50 active:scale-95 transition-all">Execute Print ({selectedForPrint.length})</button>
           </div>
 
           <div className="space-y-3">
-             {allBookings.length === 0 ? (
-               <div className="bg-white py-12 text-center rounded-[32px] border border-dashed border-gray-100"><p className="text-gray-400 font-black uppercase text-[10px] tracking-widest">No Active Bookings</p></div>
+              <div className="flex gap-2 mb-4 px-1">
+                 <select value={printFilterTour} onChange={e => setPrintFilterTour(e.target.value)} className="flex-1 bg-white border border-gray-100 px-3 py-3 rounded-xl text-[10px] font-black uppercase text-indigo-600 outline-none">
+                    <option value="">All Tours</option>
+                    {tours.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+                 </select>
+                 <select value={printFilterBooker} onChange={e => setPrintFilterBooker(e.target.value)} className="flex-1 bg-white border border-gray-100 px-3 py-3 rounded-xl text-[10px] font-black uppercase text-indigo-600 outline-none">
+                    <option value="">All Agents</option>
+                    {agents.map(a => <option key={a.code} value={a.code}>{a.name}</option>)}
+                 </select>
+              </div>
+             {filteredPrintBookings.length === 0 ? (
+               <div className="bg-white py-12 text-center rounded-[32px] border border-dashed border-gray-100"><p className="text-gray-400 font-black uppercase text-[10px] tracking-widest">No Matching Bookings</p></div>
              ) : (
-               allBookings.map((b) => (
+               filteredPrintBookings.map((b) => (
                  <div key={b.id} onClick={() => setSelectedForPrint(prev => prev.includes(b.id) ? prev.filter(p => p !== b.id) : [...prev, b.id])} className={`bg-white p-5 rounded-[28px] border transition-all cursor-pointer flex items-center justify-between ${selectedForPrint.includes(b.id) ? 'border-indigo-600 bg-indigo-50 shadow-md' : 'border-gray-100 shadow-sm'}`}>
                     <div className="flex items-center gap-4 flex-1">
                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center border-2 transition-all ${selectedForPrint.includes(b.id) ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200 text-transparent'}`}><i className="fas fa-check text-[10px]"></i></div>
@@ -500,10 +537,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
            <div className="bg-white p-6 md:p-8 rounded-[40px] shadow-sm border border-gray-100 flex flex-col gap-6">
               <div className="flex justify-between items-center">
                  <h3 className="text-xl font-black text-[#001D4A] tracking-tighter uppercase">Token Wizard</h3>
-                 <button onClick={() => setSelectedForPrint([])} className="text-[10px] font-black text-gray-400 uppercase">Clear</button>
+                 <div className="flex gap-4">
+                    <button onClick={() => setSelectedForPrint(filteredFoodBookings.map(b => b.id))} className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Select All</button>
+                    <button onClick={() => setSelectedForPrint([])} className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Deselect All</button>
+                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <div className="space-y-1">
                     <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Meal Period</label>
                     <select value={foodType} onChange={e => setFoodType(e.target.value as any)} className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl font-black text-[#001D4A] uppercase text-xs outline-none">
@@ -512,7 +552,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                  </div>
                  <div className="space-y-1">
                     <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Target Serving Time</label>
-                    <input type="text" value={foodTime} onChange={e => setFoodTime(e.target.value)} className="w-full px-5 py-4 bg-orange-50 border-none rounded-2xl font-black text-orange-600 text-center text-xl outline-none" />
+                    <input type="text" value={foodTime} onChange={e => setFoodTime(e.target.value)} className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl font-black text-orange-600 text-center text-sm outline-none" />
+                 </div>
+                 <div className="md:col-span-2 space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Food Menu / Description</label>
+                    <input type="text" value={foodMenu} onChange={e => setFoodMenu(e.target.value)} placeholder="e.g. Rice, Chicken, Dal, Salad" className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl font-bold text-[#001D4A] text-sm outline-none" />
                  </div>
               </div>
 
