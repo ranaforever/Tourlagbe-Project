@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { BusData, BookingInfo, Expense } from '../types';
 
 interface DashboardProps {
@@ -8,10 +8,17 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ buses, expenses }) => {
+  const [selectedAgent, setSelectedAgent] = useState<{name: string, bookings: BookingInfo[]} | null>(null);
+
   const allBookings: BookingInfo[] = useMemo(() => 
     buses.flatMap(b => b.seats.filter(s => s.isBooked).map(s => s.bookingInfo!)),
     [buses]
   );
+  
+  const handleAgentClick = (name: string) => {
+    const agentBookings = allBookings.filter(b => b.bookedBy.trim().toUpperCase() === name.toUpperCase());
+    setSelectedAgent({ name, bookings: agentBookings });
+  };
   
   const totalRevenue = allBookings.reduce((sum, b) => sum + (b.tourFees + b.customerTypeFees - b.discountAmount), 0);
   const totalDue = allBookings.reduce((sum, b) => sum + b.dueAmount, 0);
@@ -129,7 +136,7 @@ const Dashboard: React.FC<DashboardProps> = ({ buses, expenses }) => {
               </h3>
               <div className="space-y-4 relative z-10 max-h-[500px] overflow-y-auto no-scrollbar">
                 {agentStats.byBookings.length > 0 ? agentStats.byBookings.map((agent, idx) => (
-                  <div key={agent.name} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl transition-colors border border-white/5">
+                  <div key={agent.name} onClick={() => handleAgentClick(agent.name)} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl transition-colors border border-white/5 cursor-pointer hover:bg-white/10">
                     <div className="flex items-center gap-4">
                        <div className="relative">
                          <span className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs ${idx === 0 ? 'bg-orange-500' : 'bg-white/10'}`}>
@@ -160,7 +167,7 @@ const Dashboard: React.FC<DashboardProps> = ({ buses, expenses }) => {
               </h3>
               <div className="space-y-4 max-h-[500px] overflow-y-auto no-scrollbar">
                 {agentStats.byDiscount.length > 0 ? agentStats.byDiscount.filter(a => a.discount > 0).map((agent, idx) => (
-                  <div key={agent.name} className="flex items-center justify-between p-4 bg-red-50/50 rounded-2xl border border-red-100">
+                  <div key={agent.name} onClick={() => handleAgentClick(agent.name)} className="flex items-center justify-between p-4 bg-red-50/50 rounded-2xl border border-red-100 cursor-pointer hover:bg-red-100/50">
                     <div className="flex items-center gap-4">
                        <span className="text-xs font-black text-red-400">#{idx + 1}</span>
                        <div>
@@ -187,7 +194,7 @@ const Dashboard: React.FC<DashboardProps> = ({ buses, expenses }) => {
               </h3>
               <div className="space-y-4 max-h-[500px] overflow-y-auto no-scrollbar">
                 {agentStats.byDue.length > 0 ? agentStats.byDue.filter(a => a.due > 0).map((agent, idx) => (
-                  <div key={agent.name} className="flex items-center justify-between p-4 bg-orange-50/50 rounded-2xl border border-orange-100">
+                  <div key={agent.name} onClick={() => handleAgentClick(agent.name)} className="flex items-center justify-between p-4 bg-orange-50/50 rounded-2xl border border-orange-100 cursor-pointer hover:bg-orange-100/50">
                     <div className="flex items-center gap-4">
                        <span className="text-xs font-black text-orange-400">#{idx + 1}</span>
                        <div>
@@ -206,6 +213,38 @@ const Dashboard: React.FC<DashboardProps> = ({ buses, expenses }) => {
            </div>
         </div>
       </div>
+
+      {selectedAgent && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-[#001D4A]/80 backdrop-blur-md">
+          <div className="bg-white w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="bg-[#001D4A] p-6 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-black uppercase tracking-tight">{selectedAgent.name}'s Bookings</h3>
+                <p className="text-orange-400 text-[10px] uppercase font-black tracking-widest mt-1">Total: {selectedAgent.bookings.length} Seats</p>
+              </div>
+              <button onClick={() => setSelectedAgent(null)} className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center"><i className="fas fa-times"></i></button>
+            </div>
+            <div className="p-6 overflow-y-auto custom-scrollbar">
+              <div className="space-y-3">
+                {selectedAgent.bookings.map((b, i) => (
+                  <div key={i} className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex justify-between items-center">
+                    <div>
+                      <p className="font-black text-[#001D4A] text-sm">{b.tourName}</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">Seat: {b.seatNo} • {new Date(b.bookingDate).toLocaleDateString()}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-black text-indigo-600 text-sm">৳{(b.tourFees + b.customerTypeFees - b.discountAmount).toLocaleString()}</p>
+                      <p className={`text-[9px] font-black uppercase ${b.dueAmount > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                        {b.dueAmount > 0 ? `Due: ৳${b.dueAmount}` : 'Fully Paid'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

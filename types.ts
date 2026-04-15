@@ -81,4 +81,5 @@ export interface Booker {
 export interface CustomerType {
   type: string;
   fee: number;
+  sort_order?: number;
 }

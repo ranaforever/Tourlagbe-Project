@@ -10,18 +10,20 @@ interface EditDataProps {
   onEdit: (info: BookingInfo) => void;
   bookers: Booker[];
   isAdmin?: boolean;
+  currentAgentCode?: string;
 }
 
-const EditData: React.FC<EditDataProps> = ({ buses, onDelete, onBulkDelete, onEdit, bookers, isAdmin }) => {
+const EditData: React.FC<EditDataProps> = ({ buses, onDelete, onBulkDelete, onEdit, bookers, isAdmin, currentAgentCode }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTour, setFilterTour] = useState('');
   const [filterBooker, setFilterBooker] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  const allBookings: BookingInfo[] = useMemo(() => 
-    buses.flatMap(b => b.seats.filter(s => s.isBooked).map(s => s.bookingInfo!)),
-    [buses]
-  );
+  const allBookings: BookingInfo[] = useMemo(() => {
+    const raw = buses.flatMap(b => b.seats.filter(s => s.isBooked).map(s => s.bookingInfo!));
+    if (isAdmin) return raw;
+    return raw.filter(b => b.bookerCode.toUpperCase() === currentAgentCode?.toUpperCase());
+  }, [buses, isAdmin, currentAgentCode]);
 
   const filtered = useMemo(() => {
     return allBookings.filter(b => {
@@ -96,8 +98,10 @@ const EditData: React.FC<EditDataProps> = ({ buses, onDelete, onBulkDelete, onEd
                onChange={(e) => setFilterBooker(e.target.value)}
                className="w-full px-4 py-3 bg-indigo-50 border-none rounded-xl font-black text-indigo-600 text-[10px] uppercase outline-none"
              >
-               <option value="">All Agents</option>
-               {bookers.map(agent => <option key={agent.code} value={agent.code}>{agent.name}</option>)}
+               <option value="">{isAdmin ? 'All Agents' : 'My Bookings'}</option>
+               {bookers.filter(a => isAdmin || a.code.toUpperCase() === currentAgentCode?.toUpperCase()).map(agent => (
+                 <option key={agent.code} value={agent.code}>{agent.name}</option>
+               ))}
              </select>
              
              {isAdmin && (

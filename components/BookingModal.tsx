@@ -22,7 +22,7 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
     gender: existingData?.gender || Gender.MALE,
     religion: existingData?.religion || Religion.MUSLIM,
     tourName: existingData?.tourName || busNo,
-    customerType: existingData?.customerType || (customerTypes.length > 0 ? customerTypes[0].type : ''),
+    customerType: existingData?.customerType || (customerTypes.find(c => c.fee === 0)?.type || (customerTypes.length > 0 ? customerTypes[0].type : '')),
     discountAmount: existingData?.discountAmount || 0,
     advanceAmount: existingData?.advanceAmount || 0,
     bookerCode: existingData?.bookerCode || (isAdmin ? 'ADMIN' : '')
@@ -59,7 +59,19 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
   }, [formData, tours, bookers, customerTypes]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+    
+    if (name === 'mobile') {
+      // Remove non-digits
+      value = value.replace(/\D/g, '');
+      // Remove leading zero if present
+      if (value.startsWith('0')) {
+        value = value.substring(1);
+      }
+      // Limit to 10 digits (since +880 is already there, and BD numbers are 11 digits total including leading 0)
+      value = value.substring(0, 10);
+    }
+    
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 

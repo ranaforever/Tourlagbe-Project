@@ -1,9 +1,34 @@
 
--- Optimized SQL Setup for Tour লাগবে (Tour Lagbe)
--- This script ensures that Admin Panel edits (like renaming a tour) 
--- automatically update all existing bookings.
+-- ===============================================================
+-- TOUR LAGBE (Tour লাগবে) - FINAL AUTO-REPAIR SETUP (v2)
+-- ===============================================================
 
--- 1. Master Data Tables
+-- 1. ENSURE COLUMNS EXIST (Fixes "column does not exist" errors)
+DO $$
+BEGIN
+    -- Add tour_name to tl_bookings if missing
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'tl_bookings') THEN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tl_bookings' AND column_name='tour_name') THEN
+            ALTER TABLE tl_bookings ADD COLUMN tour_name TEXT;
+        END IF;
+    END IF;
+
+    -- Add tour_name to tl_expenses if missing
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'tl_expenses') THEN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tl_expenses' AND column_name='tour_name') THEN
+            ALTER TABLE tl_expenses ADD COLUMN tour_name TEXT;
+        END IF;
+    END IF;
+
+    -- NEW: Add sort_order to tl_customer_types if missing
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'tl_customer_types') THEN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tl_customer_types' AND column_name='sort_order') THEN
+            ALTER TABLE tl_customer_types ADD COLUMN sort_order INTEGER DEFAULT 0;
+        END IF;
+    END IF;
+END $$;
+
+-- 2. MASTER DATA TABLES
 CREATE TABLE IF NOT EXISTS tl_tours (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT UNIQUE NOT NULL,
@@ -23,10 +48,11 @@ CREATE TABLE IF NOT EXISTS tl_customer_types (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   type TEXT UNIQUE NOT NULL,
   fee NUMERIC NOT NULL DEFAULT 0,
+  sort_order INTEGER DEFAULT 0, -- Added for reordering
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. Transactional Table with Cascading Relations
+-- 3. TRANSACTIONAL TABLES (Ensures they exist)
 CREATE TABLE IF NOT EXISTS tl_bookings (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -34,8 +60,7 @@ CREATE TABLE IF NOT EXISTS tl_bookings (
   address TEXT,
   gender TEXT,
   religion TEXT,
-  -- Link to tour name. ON UPDATE CASCADE ensures renames in Admin Panel flow through.
-  tour_name TEXT REFERENCES tl_tours(name) ON UPDATE CASCADE ON DELETE SET NULL,
+  tour_name TEXT,
   tour_fees NUMERIC DEFAULT 0,
   customer_type TEXT,
   customer_type_fees NUMERIC DEFAULT 0,
@@ -59,11 +84,11 @@ CREATE TABLE IF NOT EXISTS tl_expenses (
   date DATE NOT NULL DEFAULT CURRENT_DATE,
   recorded_by TEXT,
   agent_code TEXT,
-  -- Link to tour name for reporting
-  tour_name TEXT REFERENCES tl_tours(name) ON UPDATE CASCADE ON DELETE SET NULL,
+  tour_name TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 4. SEAT LOCKING SYSTEM
 CREATE TABLE IF NOT EXISTS tl_locks (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   bus_no TEXT NOT NULL,
@@ -74,26 +99,26 @@ CREATE TABLE IF NOT EXISTS tl_locks (
   UNIQUE(bus_no, seat_no)
 );
 
--- 3. Performance Indexes
+-- 5. PERFORMANCE INDEXES
 CREATE INDEX IF NOT EXISTS idx_bookings_mobile ON tl_bookings(mobile);
 CREATE INDEX IF NOT EXISTS idx_bookings_tour ON tl_bookings(tour_name);
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON tl_expenses(date);
 
--- 4. Realtime Configuration (Idempotent)
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
-    CREATE PUBLICATION supabase_realtime;
-  END IF;
-END $$;
-
--- Function to clear expired locks (can be called from frontend or via cron)
+-- 6. CLEANUP FUNCTION
 CREATE OR REPLACE FUNCTION clear_expired_locks() 
 RETURNS void AS $$
 BEGIN
   DELETE FROM tl_locks WHERE expires_at < NOW();
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 7. REALTIME & SECURITY CONFIGURATION
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    CREATE PUBLICATION supabase_realtime;
+  END IF;
+END $$;
 
 DO $$
 DECLARE
@@ -103,22 +128,41 @@ BEGIN
     FOREACH tbl_name IN ARRAY tbl_list
     LOOP
         IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = tbl_name AND schemaname = 'public') THEN
-            -- Enable Realtime
-            IF NOT EXISTS (
-                SELECT 1 FROM pg_publication_tables 
-                WHERE pubname = 'supabase_realtime' 
-                AND tablename = tbl_name
-            ) THEN
+            IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = tbl_name) THEN
                 EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', tbl_name);
             END IF;
-            
-            -- Enable RLS
             EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', tbl_name);
-            
-            -- Create permissive policies for anon role (to match current app usage)
-            -- Note: For production, consider using auth.uid() and more restrictive roles.
             EXECUTE format('DROP POLICY IF EXISTS "Allow all access to %I" ON %I', tbl_name, tbl_name);
             EXECUTE format('CREATE POLICY "Allow all access to %I" ON %I FOR ALL USING (true) WITH CHECK (true)', tbl_name, tbl_name);
         END IF;
     END LOOP;
+END $$;
+
+-- 8. DATA SYNC & CASCADING UPDATES (Fixes "SYLHET DAY LONG" and Foreign Key errors)
+DO $$
+BEGIN
+    -- Step A: Sync missing tours from bookings (like "SYLHET DAY LONG ( BUS 1)")
+    INSERT INTO tl_tours (name, fee)
+    SELECT DISTINCT b.tour_name, 0
+    FROM tl_bookings b
+    LEFT JOIN tl_tours t ON b.tour_name = t.name
+    WHERE t.name IS NULL AND b.tour_name IS NOT NULL
+    ON CONFLICT (name) DO NOTHING;
+
+    -- Step B: Sync missing tours from expenses
+    INSERT INTO tl_tours (name, fee)
+    SELECT DISTINCT e.tour_name, 0
+    FROM tl_expenses e
+    LEFT JOIN tl_tours t ON e.tour_name = t.name
+    WHERE t.name IS NULL AND e.tour_name IS NOT NULL
+    ON CONFLICT (name) DO NOTHING;
+
+    -- Step C: Apply Foreign Key constraints
+    ALTER TABLE tl_bookings DROP CONSTRAINT IF EXISTS tl_bookings_tour_name_fkey;
+    ALTER TABLE tl_bookings ADD CONSTRAINT tl_bookings_tour_name_fkey 
+    FOREIGN KEY (tour_name) REFERENCES tl_tours(name) ON UPDATE CASCADE ON DELETE SET NULL;
+    
+    ALTER TABLE tl_expenses DROP CONSTRAINT IF EXISTS tl_expenses_tour_name_fkey;
+    ALTER TABLE tl_expenses ADD CONSTRAINT tl_expenses_tour_name_fkey 
+    FOREIGN KEY (tour_name) REFERENCES tl_tours(name) ON UPDATE CASCADE ON DELETE SET NULL;
 END $$;

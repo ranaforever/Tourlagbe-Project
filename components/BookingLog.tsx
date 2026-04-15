@@ -5,9 +5,10 @@ import { BusData, BookingInfo, Booker } from '../types';
 interface BookingLogProps {
   buses: BusData[];
   bookers: Booker[];
+  isAdmin?: boolean;
 }
 
-const BookingLog: React.FC<BookingLogProps> = ({ buses }) => {
+const BookingLog: React.FC<BookingLogProps> = ({ buses, isAdmin }) => {
   const [filterTour, setFilterTour] = useState('');
   const [filterBooker, setFilterBooker] = useState('');
   const [filterDate, setFilterDate] = useState('');
@@ -29,7 +30,7 @@ const BookingLog: React.FC<BookingLogProps> = ({ buses }) => {
   const uniqueTours = useMemo(() => Array.from(new Set(allBookings.map(b => b.tourName))), [allBookings]);
 
   const downloadCSV = () => {
-    const headers = ['Seat', 'Name', 'Mobile', 'Tour', 'Total Fees', 'Advance', 'Due', 'Status', 'Booked By', 'Booker ID', 'Date'];
+    const headers = ['Seat', 'Name', 'Mobile', 'Tour', 'Total Fees', 'Advance', 'Due', 'Status', 'Booked By', ...(isAdmin ? ['Booker ID'] : []), 'Date'];
     const rows = filteredBookings.map(b => [
       `${b.busNo}-${b.seatNo}`,
       b.name,
@@ -40,7 +41,7 @@ const BookingLog: React.FC<BookingLogProps> = ({ buses }) => {
       b.dueAmount,
       b.paymentStatus,
       b.bookedBy,
-      b.bookerCode,
+      ...(isAdmin ? [b.bookerCode] : []),
       new Date(b.bookingDate).toLocaleDateString()
     ]);
 

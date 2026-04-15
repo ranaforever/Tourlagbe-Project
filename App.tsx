@@ -52,7 +52,7 @@ const App: React.FC = () => {
       const [toursRes, bookersRes, typesRes, bookingsRes, expensesRes, locksRes] = await Promise.all([
         supabase.from('tl_tours').select('*').order('name'),
         supabase.from('tl_agents').select('*').order('name'),
-        supabase.from('tl_customer_types').select('*').order('type'),
+        supabase.from('tl_customer_types').select('*').order('sort_order', { ascending: true }),
         supabase.from('tl_bookings').select('*'),
         supabase.from('tl_expenses').select('*').order('date', { ascending: false }),
         supabase.from('tl_locks').select('*')
@@ -276,7 +276,11 @@ const App: React.FC = () => {
 
   const handleCustomerTypeUpsert = async (type: CustomerType) => {
     try {
-      const { error } = await supabase.from('tl_customer_types').upsert({ type: type.type, fee: type.fee }, { onConflict: 'type' });
+      const { error } = await supabase.from('tl_customer_types').upsert({ 
+        type: type.type, 
+        fee: type.fee,
+        sort_order: type.sort_order 
+      }, { onConflict: 'type' });
       if (error) throw error;
       fetchData();
     } catch (e) { alert("Failed to save pricing type."); }
@@ -483,10 +487,10 @@ const App: React.FC = () => {
             </div>
           )}
           {activeTab === 'dashboard' && <Dashboard buses={buses} expenses={expenses} />}
-          {activeTab === 'log' && <BookingLog buses={buses} bookers={bookers} />}
+          {activeTab === 'log' && <BookingLog buses={buses} bookers={bookers} isAdmin={isAdminAuthenticated} />}
           {activeTab === 'expenses' && <ExpenseTracker expenses={expenses} onSubmit={handleExpenseSubmit} onDelete={handleExpenseDelete} bookers={bookers} initialAgentCode={authenticatedAgent?.code} tours={tours} isAdmin={isAdminAuthenticated} />}
           {activeTab === 'revenue' && <RevenueReport buses={buses} expenses={expenses} tours={tours} isAdmin={isAdminAuthenticated} onClearExpenses={handleClearExpenses} />}
-          {activeTab === 'edit' && <EditData buses={buses} onUpdate={handleBookingSubmit} onDelete={handleBookingDelete} onBulkDelete={handleBulkDelete} onEdit={(info) => { setEditingInfo(info); setSelectedSeatId(info.seatNo); setShowBookingModal(true); }} bookers={bookers} isAdmin={isAdminAuthenticated} />}
+          {activeTab === 'edit' && <EditData buses={buses} onUpdate={handleBookingSubmit} onDelete={handleBookingDelete} onBulkDelete={handleBulkDelete} onEdit={(info) => { setEditingInfo(info); setSelectedSeatId(info.seatNo); setShowBookingModal(true); }} bookers={bookers} isAdmin={isAdminAuthenticated} currentAgentCode={authenticatedAgent?.code} />}
           {activeTab === 'admin' && isAdminAuthenticated && (
             <AdminPanel 
               tours={tours} onUpsertTour={handleTourUpsert} onDeleteTour={handleTourDelete}

@@ -88,7 +88,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const addType = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newType.type.trim()) return;
-    await onUpsertCustomerType({ type: newType.type.trim(), fee: newType.fee });
+    const maxOrder = customerTypes.reduce((max, t) => Math.max(max, t.sort_order || 0), 0);
+    await onUpsertCustomerType({ 
+      type: newType.type.trim(), 
+      fee: newType.fee,
+      sort_order: maxOrder + 1
+    });
     setNewType({ type: '', fee: 0 });
   };
 
@@ -285,6 +290,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     { id: 'food', label: 'Food', icon: 'fa-utensils' }
   ];
 
+  const moveType = async (index: number, direction: 'up' | 'down') => {
+    const newTypes = [...customerTypes];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newTypes.length) return;
+
+    const current = { ...newTypes[index] };
+    const target = { ...newTypes[targetIndex] };
+
+    // Swap sort orders
+    const currentOrder = current.sort_order || index;
+    const targetOrder = target.sort_order || targetIndex;
+
+    await onUpsertCustomerType({ ...current, sort_order: targetOrder });
+    await onUpsertCustomerType({ ...target, sort_order: currentOrder });
+  };
+
   return (
     <div className="max-w-4xl mx-auto md:pl-12 pb-20 px-2 md:px-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 px-2">
@@ -421,6 +442,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     )}
                   </div>
                   <div className="flex gap-2">
+                     <div className="flex flex-col gap-1 mr-2">
+                        <button onClick={() => moveType(i, 'up')} disabled={i === 0} className="text-gray-300 hover:text-indigo-600 disabled:opacity-30"><i className="fas fa-chevron-up text-[10px]"></i></button>
+                        <button onClick={() => moveType(i, 'down')} disabled={i === customerTypes.length - 1} className="text-gray-300 hover:text-indigo-600 disabled:opacity-30"><i className="fas fa-chevron-down text-[10px]"></i></button>
+                     </div>
                      {editTypeIndex === i ? (
                         <button onClick={saveTypeEdit} className="w-10 h-10 bg-green-50 text-green-600 rounded-xl flex items-center justify-center"><i className="fas fa-check"></i></button>
                      ) : (
