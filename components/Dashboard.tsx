@@ -9,6 +9,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ buses, expenses }) => {
   const [selectedAgent, setSelectedAgent] = useState<{name: string, bookings: BookingInfo[]} | null>(null);
+  const [modalFilter, setModalFilter] = useState('');
 
   const allBookings: BookingInfo[] = useMemo(() => 
     buses.flatMap(b => b.seats.filter(s => s.isBooked).map(s => s.bookingInfo!)),
@@ -222,15 +223,36 @@ const Dashboard: React.FC<DashboardProps> = ({ buses, expenses }) => {
                 <h3 className="text-xl font-black uppercase tracking-tight">{selectedAgent.name}'s Bookings</h3>
                 <p className="text-orange-400 text-[10px] uppercase font-black tracking-widest mt-1">Total: {selectedAgent.bookings.length} Seats</p>
               </div>
-              <button onClick={() => setSelectedAgent(null)} className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center"><i className="fas fa-times"></i></button>
+              <button onClick={() => { setSelectedAgent(null); setModalFilter(''); }} className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center"><i className="fas fa-times"></i></button>
             </div>
+            
+            <div className="px-6 pt-4">
+               <select 
+                 value={modalFilter}
+                 onChange={(e) => setModalFilter(e.target.value)}
+                 className="w-full bg-gray-50 border-none rounded-2xl px-5 py-3 text-[10px] font-black text-[#001D4A] outline-none appearance-none uppercase tracking-widest"
+               >
+                 <option value="">All Tours / Buses</option>
+                 {Array.from(new Set(selectedAgent.bookings.map(b => b.tourName))).map(t => (
+                   <option key={t} value={t}>{t}</option>
+                 ))}
+               </select>
+            </div>
+
             <div className="p-6 overflow-y-auto custom-scrollbar">
               <div className="space-y-3">
-                {selectedAgent.bookings.map((b, i) => (
+                {selectedAgent.bookings
+                  .filter(b => modalFilter === '' || b.tourName === modalFilter)
+                  .map((b, i) => (
                   <div key={i} className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex justify-between items-center">
                     <div>
-                      <p className="font-black text-[#001D4A] text-sm">{b.tourName}</p>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase">Seat: {b.seatNo} • {new Date(b.bookingDate).toLocaleDateString()}</p>
+                      <p className="font-black text-[#001D4A] text-base leading-tight">{b.name}</p>
+                      <p className="text-[10px] font-bold text-indigo-600 uppercase mt-0.5">
+                        Seat: {b.seatNo} • <span className="text-gray-400">+880{b.mobile}</span>
+                      </p>
+                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter mt-1 italic">
+                        {b.tourName}
+                      </p>
                     </div>
                     <div className="text-right">
                       <p className="font-black text-indigo-600 text-sm">৳{(b.tourFees + b.customerTypeFees - b.discountAmount).toLocaleString()}</p>
