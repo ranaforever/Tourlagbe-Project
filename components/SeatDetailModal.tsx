@@ -11,11 +11,15 @@ interface SeatDetailModalProps {
   onCancel: () => void;
   onUpdate?: (updatedInfo: BookingInfo) => void;
   isAdmin?: boolean;
+  currentAgentCode?: string;
+  notify?: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 
-const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit, onCancel, onUpdate, isAdmin }) => {
+const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit, onCancel, onUpdate, isAdmin, currentAgentCode, notify }) => {
   const ticketRef = useRef<HTMLDivElement>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+  const canEdit = isAdmin || info.bookerCode.toUpperCase() === currentAgentCode?.toUpperCase();
 
   const qrData = `ID:${info.id}|Seat:${info.seatNo}|Name:${info.name}|Tour:${info.tourName}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
@@ -34,9 +38,10 @@ const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit
       try {
         await onUpdate(updatedInfo);
         setShowPaymentModal(false);
+        notify?.("Payment processed successfully!", 'success');
       } catch (error) {
         console.error("Update failed:", error);
-        alert("Could not process payment. Please try again.");
+        notify?.("Could not process payment. Please try again.", 'error');
       }
     }
   };
@@ -76,9 +81,9 @@ const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit
     } else {
       try {
         await navigator.clipboard.writeText(message);
-        alert("Ticket details copied to clipboard!");
+        notify?.("Ticket details copied to clipboard!", 'success');
       } catch (err) {
-        alert("Could not share ticket.");
+        notify?.("Could not share ticket.", 'error');
       }
     }
   };
@@ -185,7 +190,7 @@ const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit
                 <div className="border-t border-dashed border-gray-100 my-6 pt-6 flex justify-between items-end">
                    <div className="text-left">
                       <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Agent Details</p>
-                      <p className="text-[12px] md:text-sm font-black text-gray-800 uppercase leading-none">{info.bookedBy} ({info.bookerCode})</p>
+                      <p className="text-[12px] md:text-sm font-black text-gray-800 uppercase leading-none">{info.bookedBy}</p>
                    </div>
                    <div className="text-right">
                       {info.dueAmount > 0 && (
@@ -216,15 +221,16 @@ const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit
                   
                   <button 
                     onClick={onEdit}
-                    className="py-4 md:py-5 bg-[#eef5ff] text-[#3b82f6] rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base flex items-center justify-center gap-2 transition-all active:scale-95"
+                    disabled={!canEdit}
+                    className={`py-4 md:py-5 rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base flex items-center justify-center gap-2 transition-all active:scale-95 ${canEdit ? 'bg-[#eef5ff] text-[#3b82f6]' : 'bg-gray-100 text-gray-300 cursor-not-allowed'}`}
                   >
                     <i className="fas fa-user-edit"></i> Edit
                   </button>
 
                   <button 
                     onClick={() => setShowPaymentModal(true)}
-                    disabled={info.dueAmount <= 0}
-                    className={`py-4 md:py-5 rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl ${info.dueAmount > 0 ? 'bg-[#ff7a1a] text-white shadow-orange-100' : 'bg-gray-100 text-gray-300 cursor-not-allowed shadow-none'}`}
+                    disabled={info.dueAmount <= 0 || !canEdit}
+                    className={`py-4 md:py-5 rounded-[32px] md:rounded-[40px] font-black text-sm md:text-base flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl ${info.dueAmount > 0 && canEdit ? 'bg-[#ff7a1a] text-white shadow-orange-100' : 'bg-gray-100 text-gray-300 cursor-not-allowed shadow-none'}`}
                   >
                     <i className="fas fa-money-bill-wave"></i> Due Pay ৳{info.dueAmount}
                   </button>
@@ -249,6 +255,7 @@ const SeatDetailModal: React.FC<SeatDetailModalProps> = ({ info, onClose, onEdit
           onClose={() => setShowPaymentModal(false)} 
           onConfirm={handleProcessPayment} 
           isAdmin={isAdmin}
+          notify={notify}
         />
       )}
     </>

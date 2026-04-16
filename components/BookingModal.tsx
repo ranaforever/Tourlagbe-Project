@@ -12,9 +12,11 @@ interface BookingModalProps {
   customerTypes: CustomerType[];
   existingData?: BookingInfo;
   isAdmin?: boolean;
+  currentAgentCode?: string;
+  notify?: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 
-const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onSubmit, tours, bookers, customerTypes, existingData, isAdmin }) => {
+const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onSubmit, tours, bookers, customerTypes, existingData, isAdmin, currentAgentCode, notify }) => {
   const [formData, setFormData] = useState({
     name: existingData?.name || '',
     mobile: existingData?.mobile || '',
@@ -25,7 +27,7 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
     customerType: existingData?.customerType || (customerTypes.find(c => c.fee === 0)?.type || (customerTypes.length > 0 ? customerTypes[0].type : '')),
     discountAmount: existingData?.discountAmount || 0,
     advanceAmount: existingData?.advanceAmount || 0,
-    bookerCode: existingData?.bookerCode || (isAdmin ? 'ADMIN' : '')
+    bookerCode: existingData?.bookerCode || (isAdmin ? 'ADMIN' : (currentAgentCode || ''))
   });
 
   const [addPayment, setAddPayment] = useState(0);
@@ -33,6 +35,8 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
   const [customerTypeFees, setCustomerTypeFees] = useState(0);
   const [dueAmount, setDueAmount] = useState(0);
   const [bookerName, setBookerName] = useState('');
+
+  const canEdit = isAdmin || !existingData || existingData.bookerCode.toUpperCase() === currentAgentCode?.toUpperCase();
 
   useEffect(() => {
     // 1. Calculate Tour Base Fee
@@ -46,8 +50,8 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
     setCustomerTypeFees(cFee);
 
     // 3. Resolve Agent Name
-    if (formData.bookerCode.toUpperCase() === 'ADMIN') {
-       setBookerName('System Admin');
+    if (formData.bookerCode.toUpperCase() === 'ADMIN' || formData.bookerCode.toUpperCase() === 'SYSTEM ADMIN' || isAdmin) {
+       setBookerName(formData.bookerCode.toUpperCase() === 'ADMIN' ? 'System Admin' : (bookers.find(b => b.code.toUpperCase() === formData.bookerCode.toUpperCase())?.name || 'System Admin'));
     } else {
        const booker = bookers.find(b => b.code.toUpperCase() === formData.bookerCode.toUpperCase());
        setBookerName(booker ? booker.name : '');
@@ -57,9 +61,10 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
     const total = fee + cFee;
     const due = total - formData.discountAmount - formData.advanceAmount - addPayment;
     setDueAmount(due);
-  }, [formData, tours, bookers, customerTypes, addPayment]);
+  }, [formData, tours, bookers, customerTypes, addPayment, isAdmin]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    if (!canEdit) return;
     let { name, value } = e.target;
     
     if (name === 'mobile') {
@@ -77,14 +82,19 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
   };
 
   const handleNumericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!canEdit) return;
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: Number(value) }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canEdit) {
+      notify?.("Unauthorized: You cannot edit this booking.", 'error');
+      return;
+    }
     if (!isAdmin && !bookerName) {
-      alert("Invalid Agent Code.");
+      notify?.("Invalid Agent Code.", 'error');
       return;
     }
 
@@ -109,14 +119,14 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
       <div className="bg-white w-full max-w-2xl rounded-t-[40px] md:rounded-[40px] shadow-2xl animate-in slide-in-from-bottom duration-300 border border-white/20 flex flex-col max-h-[92vh] md:max-h-[95vh] overflow-hidden">
         <div className="bg-[#001D4A] p-6 md:p-8 text-white flex justify-between items-center relative shrink-0">
           <div>
-            <h3 className="text-xl font-black uppercase tracking-tight">{existingData ? 'Modify' : 'Confirm'} Seat {seatId}</h3>
+            <h3 className="text-xl font-black uppercase tracking-tight">{existingData ? (canEdit ? 'Modify' : 'View') : 'Confirm'} Seat {seatId}</h3>
             <p className="text-orange-400 text-[9px] uppercase font-black tracking-widest mt-1">{formData.tourName}</p>
           </div>
           <button onClick={onClose} className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center"><i className="fas fa-times"></i></button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 md:p-10 overflow-y-auto custom-scrollbar space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 ${!canEdit ? 'opacity-70 pointer-events-none' : ''}`}>
             <div className="space-y-5">
               <h4 className="font-black text-[#001D4A] text-[10px] uppercase tracking-widest border-l-4 border-orange-500 pl-3">Passenger Detail</h4>
               <div className="space-y-1">
@@ -169,15 +179,16 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
               </div>
 
               {existingData && dueAmount + addPayment > 0 && (
-                <div className="space-y-1 p-4 bg-orange-50 rounded-2xl border border-orange-100">
+                <div className={`space-y-1 p-4 bg-orange-50 rounded-2xl border border-orange-100 ${!canEdit ? 'opacity-50' : ''}`}>
                   <label className="text-[9px] font-black text-orange-600 uppercase tracking-widest ml-1">Pay Due (Add Payment)</label>
                   <input 
                     type="number" 
                     inputMode="numeric" 
                     value={addPayment || ''} 
-                    onChange={(e) => setAddPayment(Number(e.target.value))} 
-                    className="w-full px-5 py-4 bg-white border-none rounded-xl font-black text-orange-600 text-sm shadow-sm" 
+                    onChange={(e) => canEdit && setAddPayment(Number(e.target.value))} 
+                    className={`w-full px-5 py-4 bg-white border-none rounded-xl font-black text-orange-600 text-sm shadow-sm ${!canEdit ? 'cursor-not-allowed' : ''}`} 
                     placeholder="Enter amount to pay"
+                    disabled={!canEdit}
                   />
                   <p className="text-[8px] font-bold text-orange-400 mt-1 uppercase tracking-tighter">Remaining Due after this: ৳{dueAmount.toLocaleString()}</p>
                 </div>
@@ -190,21 +201,32 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
               <div className="space-y-1">
                 <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Agent Verification</label>
                 <div className="relative">
-                  <input 
-                    required 
-                    name="bookerCode" 
-                    value={formData.bookerCode} 
-                    onChange={handleChange} 
-                    className={`w-full px-5 py-4 border-2 rounded-2xl font-black text-sm tracking-widest uppercase outline-none transition-all ${isAdmin ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : (bookerName ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-100 bg-gray-50 text-gray-800')}`} 
-                    placeholder={isAdmin ? "ADMIN BYPASS" : "YOUR CODE"} 
-                  />
-                  {(bookerName || isAdmin) && <i className="fas fa-check-circle absolute right-4 top-1/2 -translate-y-1/2 text-green-500"></i>}
+                  {bookerName && !isAdmin ? (
+                     <div className="w-full px-5 py-4 bg-indigo-50 border-2 border-indigo-200 rounded-2xl flex items-center justify-between">
+                        <span className="text-sm font-black text-indigo-700 uppercase">{bookerName}</span>
+                        <i className="fas fa-certificate text-indigo-500"></i>
+                     </div>
+                  ) : (
+                    <input 
+                      required 
+                      name="bookerCode" 
+                      value={formData.bookerCode} 
+                      onChange={handleChange} 
+                      className={`w-full px-5 py-4 border-2 rounded-2xl font-black text-sm tracking-widest uppercase outline-none transition-all ${isAdmin ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : (bookerName ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-100 bg-gray-50 text-gray-800')}`} 
+                      placeholder={isAdmin ? "ADMIN BYPASS" : "YOUR CODE"} 
+                    />
+                  )}
+                  {(bookerName || isAdmin) && isAdmin && <i className="fas fa-check-circle absolute right-4 top-1/2 -translate-y-1/2 text-green-500"></i>}
                 </div>
               </div>
             </div>
           </div>
           <div className="pt-4 sticky bottom-0 bg-white pb-2 md:pb-0">
-            <button type="submit" className="w-full py-5 bg-orange-500 text-white rounded-2xl font-black text-lg shadow-xl shadow-orange-100 active:scale-95 transition-all uppercase tracking-widest">Confirm Seat</button>
+            {canEdit ? (
+               <button type="submit" className="w-full py-5 bg-orange-500 text-white rounded-2xl font-black text-lg shadow-xl shadow-orange-100 active:scale-95 transition-all uppercase tracking-widest">Confirm Booking</button>
+            ) : (
+               <div className="w-full py-5 bg-gray-100 text-gray-400 rounded-2xl font-black text-center text-xs uppercase tracking-widest border border-dashed border-gray-200">View Only Mode</div>
+            )}
           </div>
         </form>
       </div>

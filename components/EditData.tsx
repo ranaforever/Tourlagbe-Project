@@ -11,9 +11,11 @@ interface EditDataProps {
   bookers: Booker[];
   isAdmin?: boolean;
   currentAgentCode?: string;
+  notify?: (msg: string, type: 'success' | 'error' | 'info') => void;
+  requestConfirm?: (msg: string, action: () => void) => void;
 }
 
-const EditData: React.FC<EditDataProps> = ({ buses, onDelete, onBulkDelete, onEdit, bookers, isAdmin, currentAgentCode }) => {
+const EditData: React.FC<EditDataProps> = ({ buses, onDelete, onBulkDelete, onEdit, bookers, isAdmin, currentAgentCode, notify, requestConfirm }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTour, setFilterTour] = useState('');
   const [filterBooker, setFilterBooker] = useState('');
@@ -58,7 +60,13 @@ const EditData: React.FC<EditDataProps> = ({ buses, onDelete, onBulkDelete, onEd
   const handleDeleteSelected = () => {
     if (!isAdmin) return;
     if (selectedIds.length === 0) return;
-    if (window.confirm(`Admin Action: Permanently delete ${selectedIds.length} bookings?`)) {
+    if (requestConfirm) {
+      requestConfirm(`Admin Action: Permanently delete ${selectedIds.length} bookings?`, () => {
+        onBulkDelete?.(selectedIds);
+        setSelectedIds([]);
+        notify?.("Bulk deletion successful.", 'success');
+      });
+    } else if (window.confirm(`Admin Action: Permanently delete ${selectedIds.length} bookings?`)) {
       onBulkDelete?.(selectedIds);
       setSelectedIds([]);
     }
@@ -66,7 +74,12 @@ const EditData: React.FC<EditDataProps> = ({ buses, onDelete, onBulkDelete, onEd
 
   const handleDeleteSingle = (booking: BookingInfo) => {
     if (!isAdmin) return;
-    if (window.confirm(`Admin Action: Delete booking for ${booking.name}?`)) {
+    if (requestConfirm) {
+      requestConfirm(`Admin Action: Delete booking for ${booking.name}?`, () => {
+        onDelete(booking.busNo, booking.seatNo);
+        notify?.("Booking removed.", 'success');
+      });
+    } else if (window.confirm(`Admin Action: Delete booking for ${booking.name}?`)) {
       onDelete(booking.busNo, booking.seatNo);
     }
   };

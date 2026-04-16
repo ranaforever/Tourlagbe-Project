@@ -5,9 +5,10 @@ import { BusData, BookingInfo, Expense } from '../types';
 interface DashboardProps {
   buses: BusData[];
   expenses: Expense[];
+  notify?: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ buses, expenses }) => {
+const Dashboard: React.FC<DashboardProps> = ({ buses, expenses, notify }) => {
   const [selectedAgent, setSelectedAgent] = useState<{name: string, bookings: BookingInfo[]} | null>(null);
   const [modalFilter, setModalFilter] = useState('');
 
@@ -255,7 +256,7 @@ const Dashboard: React.FC<DashboardProps> = ({ buses, expenses }) => {
                           onClick={(e) => {
                             e.stopPropagation();
                             navigator.clipboard.writeText(`+880${b.mobile}`);
-                            alert('Number copied!');
+                            notify?.('Number copied!', 'success');
                           }}
                           className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center hover:bg-indigo-100 transition-colors"
                           title="Copy Number"

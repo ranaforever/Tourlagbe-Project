@@ -29,6 +29,14 @@ BEGIN
 END $$;
 
 -- 2. MASTER DATA TABLES
+CREATE TABLE IF NOT EXISTS tl_notices (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  content TEXT NOT NULL,
+  type TEXT DEFAULT 'info',
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS tl_tours (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT UNIQUE NOT NULL,
@@ -123,7 +131,7 @@ END $$;
 DO $$
 DECLARE
     tbl_name TEXT;
-    tbl_list TEXT[] := ARRAY['tl_bookings', 'tl_locks', 'tl_agents', 'tl_tours', 'tl_customer_types', 'tl_expenses'];
+    tbl_list TEXT[] := ARRAY['tl_bookings', 'tl_locks', 'tl_agents', 'tl_tours', 'tl_customer_types', 'tl_expenses', 'tl_notices'];
 BEGIN
     FOREACH tbl_name IN ARRAY tbl_list
     LOOP

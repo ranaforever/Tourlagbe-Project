@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Tour, Booker, CustomerType, BusData, BookingInfo } from '../types';
 import { BUSINESS_INFO } from '../constants';
+import { supabase } from '../supabase';
 
 interface AdminPanelProps {
   tours: Tour[];
@@ -14,15 +15,18 @@ interface AdminPanelProps {
   onUpsertCustomerType: (type: CustomerType) => Promise<void>;
   onDeleteCustomerType: (type: string) => Promise<void>;
   buses: BusData[];
+  notices?: any[];
+  onDeactivateNotice?: (id: string) => Promise<void>;
+  notify?: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
   tours, onUpsertTour, onDeleteTour,
   agents, onUpsertAgent, onDeleteAgent,
   customerTypes, onUpsertCustomerType, onDeleteCustomerType,
-  buses
+  buses, notices = [], onDeactivateNotice, notify
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'tours' | 'agents' | 'types' | 'print' | 'food'>('tours');
+  const [activeSubTab, setActiveSubTab] = useState<'tours' | 'agents' | 'types' | 'print' | 'food' | 'notices'>('tours');
   
   const [newTour, setNewTour] = useState({ name: '', fee: 0 });
   const [newAgent, setNewAgent] = useState({ code: '', name: '' });
@@ -306,12 +310,32 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     printWindow.document.close();
   };
 
+  const [noticeContent, setNoticeContent] = useState('');
+  const [noticeType, setNoticeType] = useState('info');
+
+  const handleNoticePost = async () => {
+    if (!noticeContent.trim()) return;
+    try {
+      const { error } = await supabase.from('tl_notices').insert({
+        content: noticeContent,
+        type: noticeType,
+        is_active: true
+      });
+      if (error) throw error;
+      setNoticeContent('');
+      notify?.("Notice published!", 'success');
+    } catch (e) {
+      notify?.("Failed to post notice.", 'error');
+    }
+  };
+
   const navTabs = [
     { id: 'tours', label: 'Tours', icon: 'fa-route' },
     { id: 'agents', label: 'Agents', icon: 'fa-user-tie' },
     { id: 'types', label: 'Pricing', icon: 'fa-tags' },
     { id: 'print', label: 'Tickets', icon: 'fa-print' },
-    { id: 'food', label: 'Food', icon: 'fa-utensils' }
+    { id: 'food', label: 'Food', icon: 'fa-utensils' },
+    { id: 'notices', label: 'Notices', icon: 'fa-bullhorn' }
   ];
 
   const moveType = async (index: number, direction: 'up' | 'down') => {
@@ -417,7 +441,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                        </div>
                     ) : (
                        <div className="flex items-center gap-3">
-                          <span className="bg-[#001D4A] text-white text-[8px] font-black px-2 py-1 rounded-lg uppercase tracking-widest">{a.code}</span>
                           <p className="font-bold text-gray-800 text-sm">{a.name}</p>
                        </div>
                     )}
@@ -586,6 +609,48 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                  </div>
               ))}
            </div>
+        </div>
+      )}
+
+      {activeSubTab === 'notices' && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+           <div className="bg-white p-8 rounded-[40px] shadow-sm border border-gray-100 flex flex-col gap-6 text-center">
+              <h3 className="text-xl font-black text-[#001D4A] tracking-tighter uppercase">Global Broadcast</h3>
+              <textarea 
+                value={noticeContent}
+                onChange={e => setNoticeContent(e.target.value)}
+                placeholder="Type your important announcement here..."
+                className="w-full px-6 py-5 bg-gray-50 border-none rounded-3xl font-bold text-sm outline-none h-32 focus:ring-2 ring-indigo-500/20"
+              />
+              <div className="flex gap-2 justify-center">
+                {['info', 'success', 'error'].map(t => (
+                  <button key={t} onClick={() => setNoticeType(t)} className={`px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest ${noticeType === t ? 'bg-[#001D4A] text-white' : 'bg-gray-100 text-gray-400'}`}>{t}</button>
+                ))}
+              </div>
+              <button onClick={handleNoticePost} className="w-full py-5 bg-[#001D4A] text-white rounded-2xl font-black shadow-lg uppercase text-xs tracking-widest active:scale-95 transition-all">Broadcast to All Agents</button>
+           </div>
+
+           {notices.length > 0 && (
+              <div className="space-y-3">
+                 <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-2">Active Broadcasts</h4>
+                 {notices.map(notice => (
+                    <div key={notice.id} className="bg-white p-6 rounded-[32px] border border-gray-100 flex items-center justify-between group">
+                       <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${notice.type === 'error' ? 'bg-red-50 text-red-500' : notice.type === 'success' ? 'bg-green-50 text-green-500' : 'bg-blue-50 text-blue-500'}`}>
+                             <i className="fas fa-bullhorn text-sm"></i>
+                          </div>
+                          <div>
+                             <p className="text-sm font-bold text-gray-800">{notice.content}</p>
+                             <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mt-1">Status: {notice.type}</p>
+                          </div>
+                       </div>
+                       <button onClick={() => onDeactivateNotice?.(notice.id)} className="w-10 h-10 bg-gray-50 text-gray-400 rounded-xl flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-colors">
+                          <i className="fas fa-times"></i>
+                       </button>
+                    </div>
+                 ))}
+              </div>
+           )}
         </div>
       )}
     </div>

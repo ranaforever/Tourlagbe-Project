@@ -10,6 +10,8 @@ interface ExpenseTrackerProps {
   initialAgentCode?: string;
   tours: Tour[];
   isAdmin?: boolean;
+  notify?: (msg: string, type: 'success' | 'error' | 'info') => void;
+  requestConfirm?: (msg: string, action: () => void) => void;
 }
 
 const EXPENSE_CATEGORIES = [
@@ -25,7 +27,7 @@ const EXPENSE_CATEGORIES = [
   'Others'
 ];
 
-const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onDelete, bookers, initialAgentCode, tours, isAdmin }) => {
+const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onDelete, bookers, initialAgentCode, tours, isAdmin, notify, requestConfirm }) => {
   const [editId, setEditId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     category: EXPENSE_CATEGORIES[0],
@@ -80,7 +82,7 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
     if (formData.agentCode !== "@Rana&01625@" && formData.agentCode !== "ADMIN") {
       const booker = bookers.find(b => b.code.toUpperCase() === formData.agentCode.toUpperCase());
       if (!booker) {
-        alert("Invalid Agent Code. Please use a registered code.");
+        notify?.("Invalid Agent Code. Please use a registered code.", 'error');
         return;
       }
       recorderName = booker.name;
@@ -105,12 +107,20 @@ const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ expenses, onSubmit, onD
 
   const handleDelete = (id: string) => {
     if (!isAdmin) {
-      alert("Unauthorized: Only Admins can delete financial records.");
+      notify?.("Unauthorized: Only Admins can delete financial records.", 'error');
       return;
     }
-    if (confirm("Permanently delete this expense record? This action cannot be undone.")) {
+    
+    const confirmDelete = () => {
       onDelete(id);
       if (editId === id) resetForm();
+      notify?.("Expense record deleted.", 'success');
+    };
+
+    if (requestConfirm) {
+      requestConfirm("Permanently delete this expense record? This action cannot be undone.", confirmDelete);
+    } else if (window.confirm("Permanently delete this expense record? This action cannot be undone.")) {
+      confirmDelete();
     }
   };
 

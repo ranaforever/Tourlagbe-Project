@@ -7,9 +7,10 @@ interface PaymentModalProps {
   onClose: () => void;
   onConfirm: (amount: number) => void;
   isAdmin?: boolean;
+  notify?: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 
-const PaymentModal: React.FC<PaymentModalProps> = ({ info, onClose, onConfirm, isAdmin }) => {
+const PaymentModal: React.FC<PaymentModalProps> = ({ info, onClose, onConfirm, isAdmin, notify }) => {
   // If admin, start directly at the 'amount' step
   const [step, setStep] = useState<'verify' | 'amount'>(isAdmin ? 'amount' : 'verify');
   const [code, setCode] = useState('');
@@ -20,7 +21,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ info, onClose, onConfirm, i
     if (code.toUpperCase() === info.bookerCode.toUpperCase()) {
       setStep('amount');
     } else {
-      alert("Unauthorized Agent Code!");
+      notify?.("Unauthorized Agent Code!", 'error');
     }
   };
 
@@ -29,12 +30,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ info, onClose, onConfirm, i
     const payValue = parseFloat(amount);
     if (!isNaN(payValue) && payValue > 0) {
       if (payValue > info.dueAmount) {
-        alert(`Error: Cannot pay more than the due amount (৳${info.dueAmount})`);
+        notify?.(`Error: Cannot pay more than the due amount (৳${info.dueAmount})`, 'error');
         return;
       }
       onConfirm(payValue);
     } else {
-      alert("Please enter a valid amount.");
+      notify?.("Please enter a valid amount.", 'error');
     }
   };
 

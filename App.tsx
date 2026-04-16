@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BUSINESS_INFO, generateInitialSeats } from './constants';
 import { BusData, BookingInfo, Tour, Booker, CustomerType, Expense, SeatLock } from './types';
+import { motion, AnimatePresence } from 'motion/react';
 import BusLayout from './components/BusLayout';
 import BookingModal from './components/BookingModal';
 import ConfirmationDialog from './components/ConfirmationDialog';
@@ -21,6 +22,7 @@ const App: React.FC = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => void } | null>(null);
 
   const [authenticatedAgent, setAuthenticatedAgent] = useState<Booker | null>(() => {
     const savedSession = sessionStorage.getItem('tl_auth_agent');
@@ -28,6 +30,13 @@ const App: React.FC = () => {
     const saved = savedSession || savedLocal;
     return saved ? JSON.parse(saved) : null;
   });
+  
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const notify = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
   const [entryCodeInput, setEntryCodeInput] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
 
@@ -43,19 +52,21 @@ const App: React.FC = () => {
   const [buses, setBuses] = useState<BusData[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [onlineAgents, setOnlineAgents] = useState<Booker[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
   const fetchData = useCallback(async () => {
     try {
       // Clean up expired locks globally to keep the table small
       await supabase.from('tl_locks').delete().lt('expires_at', new Date().toISOString());
 
-      const [toursRes, bookersRes, typesRes, bookingsRes, expensesRes, locksRes] = await Promise.all([
+      const [toursRes, bookersRes, typesRes, bookingsRes, expensesRes, locksRes, noticesRes] = await Promise.all([
         supabase.from('tl_tours').select('*').order('name'),
         supabase.from('tl_agents').select('*').order('name'),
         supabase.from('tl_customer_types').select('*').order('sort_order', { ascending: true }),
         supabase.from('tl_bookings').select('*'),
         supabase.from('tl_expenses').select('*').order('date', { ascending: false }),
-        supabase.from('tl_locks').select('*')
+        supabase.from('tl_locks').select('*'),
+        supabase.from('tl_notices').select('*').eq('is_active', true).order('created_at', { ascending: false })
       ]);
 
       const fetchedTours = toursRes.data || [];
@@ -63,6 +74,7 @@ const App: React.FC = () => {
       const fetchedTypes = typesRes.data || [];
       const fetchedBookings: any[] = bookingsRes.data || [];
       const fetchedLocks: any[] = locksRes.data || [];
+      const fetchedNotices: any[] = noticesRes.data || [];
 
       const now = new Date();
       const validLocks: SeatLock[] = fetchedLocks.filter(lock => new Date(lock.expires_at) > now);
@@ -70,6 +82,7 @@ const App: React.FC = () => {
       const onlineCutoff = new Date(Date.now() - 2 * 60 * 1000);
       const activeAgents = fetchedBookers.filter(b => b.last_active && new Date(b.last_active) > onlineCutoff);
       setOnlineAgents(activeAgents);
+      setNotifications(fetchedNotices);
 
       const mappedBookings: BookingInfo[] = fetchedBookings.map(b => ({
         id: b.id, name: b.name, mobile: b.mobile, address: b.address,
@@ -150,7 +163,7 @@ const App: React.FC = () => {
         setSelectedSeatId(sid);
         setShowBookingModal(true);
       } else {
-        alert(`This seat is currently being booked by ${seat.lockInfo.agent_name}.`);
+        notify(`Seat taken by ${seat.lockInfo.agent_name}`, 'error');
       }
       return;
     }
@@ -177,7 +190,7 @@ const App: React.FC = () => {
       });
 
       if (error) {
-        alert("Seat just taken! Refreshing data...");
+        notify("Seat just taken! Refreshing...", 'error');
         fetchData();
         return;
       }
@@ -185,7 +198,7 @@ const App: React.FC = () => {
       setSelectedSeatId(sid);
       setShowBookingModal(true);
     } catch (e) {
-      alert("System error securing seat.");
+      notify("System error securing seat.", 'error');
     }
   };
 
@@ -210,8 +223,9 @@ const App: React.FC = () => {
       
       await releaseLock(info.busNo, info.seatNo);
       fetchData();
+      notify("Booking successful!", 'success');
     } catch (error) {
-      alert("Booking failed to save.");
+      notify("Booking failed to save.", 'error');
     }
     setShowBookingModal(false);
     setShowDetailModal(false);
@@ -223,8 +237,9 @@ const App: React.FC = () => {
       const { error } = await supabase.from('tl_bookings').delete().eq('bus_no', busId).eq('seat_no', seatId);
       if (error) throw error;
       fetchData();
+      notify("Booking removed.", 'success');
     } catch (error) {
-      alert("Delete failed.");
+      notify("Delete failed.", 'error');
     }
   };
 
@@ -235,7 +250,7 @@ const App: React.FC = () => {
       if (error) throw error;
       fetchData();
     } catch (error) {
-      alert("Bulk delete failed.");
+      notify("Bulk delete failed.", 'error');
     }
   };
 
@@ -245,17 +260,23 @@ const App: React.FC = () => {
       const { error } = await supabase.from('tl_tours').upsert({ name: tour.name, fee: tour.fee }, { onConflict: 'name' });
       if (error) throw error;
       fetchData();
-    } catch (e) { alert("Failed to save tour."); }
+      notify("Tour updated", 'success');
+    } catch (e) { notify("Failed to save tour.", 'error'); }
   };
 
   const handleTourDelete = async (name: string) => {
-    if (confirm(`Warning: Deleting tour "${name}" will remove it from future selections. Existing bookings for this tour will remain in logs. Continue?`)) {
-      try {
-        const { error } = await supabase.from('tl_tours').delete().eq('name', name);
-        if (error) throw error;
-        fetchData();
-      } catch (e) { alert("Failed to delete tour."); }
-    }
+    setConfirmDialog({
+      message: `Warning: Deleting tour "${name}" will remove it from future selections. Existing bookings for this tour will remain in logs. Continue?`,
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.from('tl_tours').delete().eq('name', name);
+          if (error) throw error;
+          fetchData();
+          notify("Tour deleted", 'success');
+        } catch (e) { notify("Failed to delete tour.", 'error'); }
+        setConfirmDialog(null);
+      }
+    });
   };
 
   const handleAgentUpsert = async (agent: Booker) => {
@@ -263,7 +284,8 @@ const App: React.FC = () => {
       const { error } = await supabase.from('tl_agents').upsert({ code: agent.code, name: agent.name }, { onConflict: 'code' });
       if (error) throw error;
       fetchData();
-    } catch (e) { alert("Failed to save agent."); }
+      notify("Agent saved successfully!", 'success');
+    } catch (e) { notify("Failed to save agent.", 'error'); }
   };
 
   const handleAgentDelete = async (code: string) => {
@@ -271,7 +293,8 @@ const App: React.FC = () => {
       const { error } = await supabase.from('tl_agents').delete().eq('code', code);
       if (error) throw error;
       fetchData();
-    } catch (e) { alert("Failed to delete agent."); }
+      notify("Agent removed.", 'success');
+    } catch (e) { notify("Failed to delete agent.", 'error'); }
   };
 
   const handleCustomerTypeUpsert = async (type: CustomerType) => {
@@ -283,7 +306,8 @@ const App: React.FC = () => {
       }, { onConflict: 'type' });
       if (error) throw error;
       fetchData();
-    } catch (e) { alert("Failed to save pricing type."); }
+      notify("Pricing type updated.", 'success');
+    } catch (e) { notify("Failed to save pricing type.", 'error'); }
   };
 
   const handleCustomerTypeDelete = async (type: string) => {
@@ -291,7 +315,8 @@ const App: React.FC = () => {
       const { error } = await supabase.from('tl_customer_types').delete().eq('type', type);
       if (error) throw error;
       fetchData();
-    } catch (e) { alert("Failed to delete pricing type."); }
+      notify("Pricing type removed.", 'success');
+    } catch (e) { notify("Failed to delete pricing type.", 'error'); }
   };
 
   const handleExpenseSubmit = async (ex: Expense) => {
@@ -303,7 +328,7 @@ const App: React.FC = () => {
       if (error) throw error;
       fetchData();
     } catch (e) {
-      alert("Failed to save expense.");
+      notify("Failed to save expense.", 'error');
     }
   };
 
@@ -314,19 +339,36 @@ const App: React.FC = () => {
       if (error) throw error;
       fetchData();
     } catch (e) {
-      alert("Delete failed.");
+      notify("Delete failed.", 'error');
     }
   };
 
   const handleClearExpenses = async () => {
     if (!isAdminAuthenticated) return;
-    if (!confirm("Are you sure you want to clear ALL expense data? This cannot be undone.")) return;
+    setConfirmDialog({
+      message: "Are you sure you want to clear ALL expense data? This cannot be undone.",
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.from('tl_expenses').delete().neq('id', '0');
+          if (error) throw error;
+          fetchData();
+          notify("All expenses cleared.", 'success');
+        } catch (e) {
+          notify("Failed to clear expenses.", 'error');
+        }
+        setConfirmDialog(null);
+      }
+    });
+  };
+
+  const handleNoticeDeactivate = async (id: string) => {
     try {
-      const { error } = await supabase.from('tl_expenses').delete().neq('id', '0');
+      const { error } = await supabase.from('tl_notices').update({ is_active: false }).eq('id', id);
       if (error) throw error;
       fetchData();
+      notify("Broadcast ended.", 'success');
     } catch (e) {
-      alert("Failed to clear expenses.");
+      notify("Failed to deactivate notice.", 'error');
     }
   };
 
@@ -350,8 +392,9 @@ const App: React.FC = () => {
       storage.setItem('tl_auth_agent', JSON.stringify(agent));
       storage.setItem('tl_auth_admin', 'false');
       setEntryCodeInput('');
+      notify(`Welcome back, ${agent.name}`, 'success');
     } else {
-      alert("Identity Invalid. Please check your code.");
+      notify("Identity Invalid. Please check your code.", 'error');
     }
   };
 
@@ -467,6 +510,32 @@ const App: React.FC = () => {
         </header>
 
         <div className="max-w-7xl mx-auto">
+          {/* Notice Board */}
+          {notifications.length > 0 && (
+            <div className="mb-8 overflow-hidden">
+              <AnimatePresence mode="wait">
+                <motion.div 
+                  key={notifications[0].id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className={`p-4 md:p-6 rounded-[32px] border border-white/20 flex items-center gap-4 relative overflow-hidden backdrop-blur-md shadow-xl ${
+                    notifications[0].type === 'error' ? 'bg-red-500 text-white' : 
+                    notifications[0].type === 'success' ? 'bg-green-500 text-white' : 
+                    'bg-[#001D4A] text-white'
+                  }`}
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center shrink-0">
+                    <i className="fas fa-bullhorn text-sm animate-bounce text-orange-400"></i>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[8px] md:text-[9px] font-black uppercase tracking-widest opacity-60 mb-0.5">Live Alert Broadcast</p>
+                    <p className="text-sm md:text-base font-bold tracking-tight">{notifications[0].content}</p>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          )}
+
           {activeTab === 'booking' && (
             <div className="animate-in fade-in duration-500 space-y-6">
                <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-3 sticky top-0 z-40 overflow-x-auto no-scrollbar">
@@ -486,9 +555,9 @@ const App: React.FC = () => {
                ) : <div className="text-center py-20 bg-white rounded-[40px] border border-dashed border-gray-200"><p className="text-gray-400 font-black uppercase text-xs tracking-widest">No Active Routes</p></div>}
             </div>
           )}
-          {activeTab === 'dashboard' && <Dashboard buses={buses} expenses={expenses} />}
+          {activeTab === 'dashboard' && <Dashboard buses={buses} expenses={expenses} notify={notify} />}
           {activeTab === 'log' && <BookingLog buses={buses} bookers={bookers} isAdmin={isAdminAuthenticated} />}
-          {activeTab === 'expenses' && <ExpenseTracker expenses={expenses} onSubmit={handleExpenseSubmit} onDelete={handleExpenseDelete} bookers={bookers} initialAgentCode={authenticatedAgent?.code} tours={tours} isAdmin={isAdminAuthenticated} />}
+          {activeTab === 'expenses' && <ExpenseTracker expenses={expenses} onSubmit={handleExpenseSubmit} onDelete={handleExpenseDelete} bookers={bookers} initialAgentCode={authenticatedAgent?.code} tours={tours} isAdmin={isAdminAuthenticated} notify={notify} />}
           {activeTab === 'revenue' && <RevenueReport buses={buses} expenses={expenses} tours={tours} isAdmin={isAdminAuthenticated} onClearExpenses={handleClearExpenses} />}
           {activeTab === 'edit' && <EditData buses={buses} onUpdate={handleBookingSubmit} onDelete={handleBookingDelete} onBulkDelete={handleBulkDelete} onEdit={(info) => { setEditingInfo(info); setSelectedSeatId(info.seatNo); setShowBookingModal(true); }} bookers={bookers} isAdmin={isAdminAuthenticated} currentAgentCode={authenticatedAgent?.code} />}
           {activeTab === 'admin' && isAdminAuthenticated && (
@@ -497,14 +566,53 @@ const App: React.FC = () => {
               agents={bookers} onUpsertAgent={handleAgentUpsert} onDeleteAgent={handleAgentDelete}
               customerTypes={customerTypes} onUpsertCustomerType={handleCustomerTypeUpsert} onDeleteCustomerType={handleCustomerTypeDelete}
               buses={buses}
+              notices={notifications}
+              onDeactivateNotice={handleNoticeDeactivate}
+              notify={notify}
             />
           )}
         </div>
       </main>
 
       {showLogoutConfirm && <ConfirmationDialog message="Are you sure you want to end your session?" onConfirm={() => { setAuthenticatedAgent(null); setIsAdminAuthenticated(false); setShowLogoutConfirm(false); localStorage.removeItem('tl_auth_agent'); sessionStorage.removeItem('tl_auth_agent'); localStorage.removeItem('tl_auth_admin'); sessionStorage.removeItem('tl_auth_admin'); }} onCancel={() => setShowLogoutConfirm(false)} />}
-      {showBookingModal && <BookingModal seatId={selectedSeatId!} busNo={editingInfo ? editingInfo.busNo : (buses[selectedBusIndex]?.busId || '')} onClose={() => { releaseLock(buses[selectedBusIndex].busId, selectedSeatId!); setShowBookingModal(false); setEditingInfo(null); }} onSubmit={handleBookingSubmit} tours={tours} bookers={bookers} customerTypes={customerTypes} existingData={editingInfo || undefined} isAdmin={isAdminAuthenticated} />}
-      {showDetailModal && editingInfo && <SeatDetailModal info={editingInfo} onClose={() => { setShowDetailModal(false); setEditingInfo(null); }} onEdit={() => { setShowDetailModal(false); setShowBookingModal(true); }} onCancel={() => { handleBookingDelete(editingInfo.busNo, editingInfo.seatNo); setShowDetailModal(false); }} onUpdate={handleBookingSubmit} isAdmin={isAdminAuthenticated} />}
+      {confirmDialog && <ConfirmationDialog message={confirmDialog.message} onConfirm={confirmDialog.onConfirm} onCancel={() => setConfirmDialog(null)} />}
+      {showBookingModal && (
+        <BookingModal 
+          seatId={selectedSeatId!} 
+          busNo={editingInfo ? editingInfo.busNo : (buses[selectedBusIndex]?.busId || '')} 
+          onClose={() => { releaseLock(buses[selectedBusIndex].busId, selectedSeatId!); setShowBookingModal(false); setEditingInfo(null); }} 
+          onSubmit={handleBookingSubmit} 
+          tours={tours} 
+          bookers={bookers} 
+          customerTypes={customerTypes} 
+          existingData={editingInfo || undefined} 
+          isAdmin={isAdminAuthenticated} 
+          currentAgentCode={authenticatedAgent?.code}
+          notify={notify} 
+        />
+      )}
+      {showDetailModal && editingInfo && <SeatDetailModal info={editingInfo} onClose={() => { setShowDetailModal(false); setEditingInfo(null); }} onEdit={() => { setShowDetailModal(false); setShowBookingModal(true); }} onCancel={() => { handleBookingDelete(editingInfo.busNo, editingInfo.seatNo); setShowDetailModal(false); }} onUpdate={handleBookingSubmit} isAdmin={isAdminAuthenticated} currentAgentCode={authenticatedAgent?.code} notify={notify} />}
+      
+      {/* Dynamic Notifications (Toast) */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[200] pointer-events-none"
+          >
+            <div className={`px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border backdrop-blur-md ${
+              toast.type === 'success' ? 'bg-green-500/90 border-green-400 text-white' : 
+              toast.type === 'error' ? 'bg-red-500/90 border-red-400 text-white' : 
+              'bg-[#001D4A]/90 border-white/20 text-white'
+            }`}>
+              <i className={`fas ${toast.type === 'success' ? 'fa-check-circle' : toast.type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}`}></i>
+              <span className="text-[10px] font-black uppercase tracking-widest">{toast.message}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

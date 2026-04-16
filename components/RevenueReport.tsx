@@ -160,7 +160,6 @@ const RevenueReport: React.FC<RevenueReportProps> = ({ buses, expenses, tours, i
                      <div className="flex justify-between text-[11px] font-black mb-2 uppercase tracking-widest">
                         <div className="flex items-center gap-2">
                           <span className="text-gray-800">{data.name}</span>
-                          {isAdmin && <span className="text-[8px] bg-blue-50 text-blue-500 px-2 py-0.5 rounded uppercase tracking-tighter">ID: {code}</span>}
                         </div>
                         <span className="text-blue-600">৳{data.amount.toLocaleString()}</span>
                      </div>
