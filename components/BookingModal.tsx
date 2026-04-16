@@ -28,6 +28,7 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
     bookerCode: existingData?.bookerCode || (isAdmin ? 'ADMIN' : '')
   });
 
+  const [addPayment, setAddPayment] = useState(0);
   const [tourFees, setTourFees] = useState(0);
   const [customerTypeFees, setCustomerTypeFees] = useState(0);
   const [dueAmount, setDueAmount] = useState(0);
@@ -54,9 +55,9 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
 
     // 4. Final Math
     const total = fee + cFee;
-    const due = total - formData.discountAmount - formData.advanceAmount;
+    const due = total - formData.discountAmount - formData.advanceAmount - addPayment;
     setDueAmount(due);
-  }, [formData, tours, bookers, customerTypes]);
+  }, [formData, tours, bookers, customerTypes, addPayment]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     let { name, value } = e.target;
@@ -90,10 +91,11 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
     const info: BookingInfo = {
       id: existingData?.id || Math.random().toString(36).substr(2, 9).toUpperCase(),
       ...formData,
+      advanceAmount: formData.advanceAmount + addPayment,
       tourFees,
       customerTypeFees,
       dueAmount,
-      paymentStatus: dueAmount <= 0 ? 'Paid' : (formData.advanceAmount > 0 ? 'Partial' : 'Due'),
+      paymentStatus: dueAmount <= 0 ? 'Paid' : ((formData.advanceAmount + addPayment) > 0 ? 'Partial' : 'Due'),
       busNo: formData.tourName,
       seatNo: seatId,
       bookedBy: bookerName || 'System Admin',
@@ -165,6 +167,22 @@ const BookingModal: React.FC<BookingModalProps> = ({ seatId, busNo, onClose, onS
                 <div className="space-y-1"><label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Discount</label><input type="number" inputMode="numeric" name="discountAmount" value={formData.discountAmount || ''} onChange={handleNumericChange} className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl font-black text-sm" /></div>
                 <div className="space-y-1"><label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Advance</label><input type="number" inputMode="numeric" name="advanceAmount" value={formData.advanceAmount || ''} onChange={handleNumericChange} className="w-full px-5 py-4 bg-green-50 border-none rounded-2xl font-black text-green-700 text-sm" /></div>
               </div>
+
+              {existingData && dueAmount + addPayment > 0 && (
+                <div className="space-y-1 p-4 bg-orange-50 rounded-2xl border border-orange-100">
+                  <label className="text-[9px] font-black text-orange-600 uppercase tracking-widest ml-1">Pay Due (Add Payment)</label>
+                  <input 
+                    type="number" 
+                    inputMode="numeric" 
+                    value={addPayment || ''} 
+                    onChange={(e) => setAddPayment(Number(e.target.value))} 
+                    className="w-full px-5 py-4 bg-white border-none rounded-xl font-black text-orange-600 text-sm shadow-sm" 
+                    placeholder="Enter amount to pay"
+                  />
+                  <p className="text-[8px] font-bold text-orange-400 mt-1 uppercase tracking-tighter">Remaining Due after this: ৳{dueAmount.toLocaleString()}</p>
+                </div>
+              )}
+
               <div className="p-5 bg-gray-900 rounded-[24px] text-white flex justify-between items-center shadow-lg">
                  <span className="text-[9px] font-black text-orange-400 uppercase tracking-[0.2em]">Net Due</span>
                  <span className="text-xl font-black">৳{dueAmount.toLocaleString()}</span>

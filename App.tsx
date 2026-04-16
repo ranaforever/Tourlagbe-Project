@@ -396,7 +396,7 @@ const App: React.FC = () => {
            </form>
 
            <div className="mt-12 text-center">
-              <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest">Secured by Cloud Integration</p>
+              <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest">Developed by MASUD RANA</p>
            </div>
         </div>
       </div>

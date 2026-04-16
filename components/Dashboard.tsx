@@ -221,7 +221,9 @@ const Dashboard: React.FC<DashboardProps> = ({ buses, expenses }) => {
             <div className="bg-[#001D4A] p-6 text-white flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-black uppercase tracking-tight">{selectedAgent.name}'s Bookings</h3>
-                <p className="text-orange-400 text-[10px] uppercase font-black tracking-widest mt-1">Total: {selectedAgent.bookings.length} Seats</p>
+                <p className="text-orange-400 text-[10px] uppercase font-black tracking-widest mt-1">
+                  Total: {selectedAgent.bookings.filter(b => modalFilter === '' || b.tourName === modalFilter).length} Seats
+                </p>
               </div>
               <button onClick={() => { setSelectedAgent(null); setModalFilter(''); }} className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center"><i className="fas fa-times"></i></button>
             </div>
@@ -247,8 +249,19 @@ const Dashboard: React.FC<DashboardProps> = ({ buses, expenses }) => {
                   <div key={i} className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex justify-between items-center">
                     <div>
                       <p className="font-black text-[#001D4A] text-base leading-tight">{b.name}</p>
-                      <p className="text-[10px] font-bold text-indigo-600 uppercase mt-0.5">
+                      <p className="text-[10px] font-bold text-indigo-600 uppercase mt-0.5 flex items-center gap-2">
                         Seat: {b.seatNo} • <span className="text-gray-400">+880{b.mobile}</span>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(`+880${b.mobile}`);
+                            alert('Number copied!');
+                          }}
+                          className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center hover:bg-indigo-100 transition-colors"
+                          title="Copy Number"
+                        >
+                          <i className="fas fa-copy text-[10px]"></i>
+                        </button>
                       </p>
                       <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter mt-1 italic">
                         {b.tourName}
